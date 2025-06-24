@@ -512,7 +512,7 @@ class InstanceNode:
         return self.schema_node.type.to_raw(self.value)
 
     def to_xml(self, filter: OutputFilter = OutputFilter(),
-               elem: ET.Element = None):
+               elem: Optional[ET.Element] = None) -> ET.Element:
         """put receiver's value into a XML element"""
         has_default_ns = False
 
@@ -653,7 +653,7 @@ class InstanceNode:
         return list(self) if isinstance(self.value, ArrayValue) else [self]
 
     def _children(self,
-                  qname: Union[QualName, bool] = None) -> list["InstanceNode"]:
+                  qname: Union[QualName, bool, None] = None) -> list["InstanceNode"]:
         """XPath - return the list of receiver's children."""
         sn = self.schema_node
         if not isinstance(sn, InternalNode):
@@ -682,7 +682,7 @@ class InstanceNode:
             res.extend(wd._member(mn)._node_set())
         return res
 
-    def _descendants(self, qname: Union[QualName, bool] = None,
+    def _descendants(self, qname: Union[QualName, bool, None] = None,
                      with_self: bool = False) -> list["InstanceNode"]:
         """XPath - return the list of receiver's descendants."""
         res = ([] if not with_self or (qname and self.qual_name != qname)
@@ -694,14 +694,14 @@ class InstanceNode:
         return res
 
     def _preceding_siblings(
-            self: "InstanceNode",
-            qname: Union[QualName, bool] = None) -> list["InstanceNode"]:
+            self,
+            qname: Union[QualName, bool, None] = None) -> list["InstanceNode"]:
         """XPath - return the list of receiver's preceding-siblings."""
         return []
 
     def _following_siblings(
-            self: "InstanceNode",
-            qname: Union[QualName, bool] = None) -> list["InstanceNode"]:
+            self,
+            qname: Union[QualName, bool, None] = None) -> list["InstanceNode"]:
         """XPath - return the list of receiver's following-siblings."""
         return []
 
@@ -741,7 +741,7 @@ class RootNode(InstanceNode):
     def to_xml(
             self, filter: OutputFilter = OutputFilter(),
             tag: str = "content-data",
-            urn: str = "urn:ietf:params:xml:ns:yang:ietf-yang-instance-data"):
+            urn: str = "urn:ietf:params:xml:ns:yang:ietf-yang-instance-data") -> ET.Element:
         """put receiver's value into a XML element"""
         element = ET.Element(tag)
         element.attrib['xmlns'] = urn
@@ -750,19 +750,17 @@ class RootNode(InstanceNode):
             return et[0]
         return et
 
-    def _copy(self, newval: Value, newts: datetime = None) -> InstanceNode:
+    def _copy(self, newval: Value, newts: Optional[datetime] = None) -> InstanceNode:
         return RootNode(newval, self.schema_node, self.schema_data,
                         newts if newts else newval.timestamp)
 
-    def _ancestors_or_self(
-            self: "RootNode",
-            qname: Union[QualName, bool] = None) -> list["RootNode"]:
+    def _ancestors_or_self(self,
+            qname: Union[QualName, bool, None] = None) -> list["RootNode"]:
         """XPath - return the list of receiver's ancestors including itself."""
         return [self] if qname is None else []
 
-    def _ancestors(
-            self: "RootNode",
-            qname: Union[QualName, bool] = None) -> list["RootNode"]:
+    def _ancestors(self,
+            qname: Union[QualName, bool, None] = None) -> list["RootNode"]:
         """XPath - return the list of receiver's ancestors."""
         return []
 
@@ -811,7 +809,7 @@ class ObjectMember(InstanceNode):
         res[self.name] = self.value
         return res
 
-    def _copy(self, newval: Value, newts: datetime = None) -> "ObjectMember":
+    def _copy(self, newval: Value, newts: Optional[datetime] = None) -> "ObjectMember":
         if newts:
             ts = newts
         elif isinstance(newval, StructuredValue):
@@ -826,14 +824,14 @@ class ObjectMember(InstanceNode):
         return MemberName(loc if s else p, p if s else None)
 
     def _ancestors_or_self(
-            self: "ObjectMember",
+            self,
             qname: Union[QualName, bool] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's ancestors including itself."""
         res = [] if qname and self.qual_name != qname else [self]
         return res + self.up()._ancestors_or_self(qname)
 
     def _ancestors(
-            self: "ObjectMember",
+            self,
             qname: Union[QualName, bool] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's ancestors."""
         return self.up()._ancestors_or_self(qname)
@@ -843,10 +841,10 @@ class ArrayEntry(InstanceNode):
     """This class represents an array entry."""
 
     def __init__(
-            self: "ArrayEntry", key: int, before: deque,
+            self, key: int, before: deque,
             after: deque, value: Value,
             parinst: Optional[InstanceNode],
-            schema_node: "DataNode", timestamp: datetime = None) -> None:
+            schema_node: "DataNode", timestamp: Optional[datetime] = None) -> None:
         super().__init__(key, value, parinst, schema_node, timestamp)
         self.before = before
         """Preceding entries of the parent array."""
@@ -984,20 +982,20 @@ class ArrayEntry(InstanceNode):
         return EntryKeys(kdict)
 
     def _ancestors_or_self(
-            self: "ArrayEntry",
+            self,
             qname: Union[QualName, bool] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's ancestors including itself."""
         res = [] if qname and self.qual_name != qname else [self]
         return res + self.up()._ancestors(qname)
 
     def _ancestors(
-            self: "ArrayEntry",
+            self,
             qname: Union[QualName, bool] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's ancestors."""
         return self.up()._ancestors(qname)
 
     def _preceding_siblings(
-            self: "ArrayEntry",
+            self,
             qname: Union[QualName, bool] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's preceding siblings."""
         if qname and self.qual_name != qname:
@@ -1010,7 +1008,7 @@ class ArrayEntry(InstanceNode):
         return res
 
     def _following_siblings(
-            self: "ArrayEntry",
+            self,
             qname: Union[QualName, bool] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's following siblings."""
         if qname and self.qual_name != qname:
@@ -1164,7 +1162,7 @@ class EntryKeys:
     """
 
     def __init__(
-            self: "EntryKeys",
+            self,
             keys: dict[tuple[YangIdentifier, Optional[YangIdentifier]],
                        str]) -> None:
         """Initialize the class instance.

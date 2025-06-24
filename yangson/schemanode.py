@@ -563,7 +563,7 @@ class InternalNode(SchemaNode):
         return res
 
     def from_xml(self, rval: ET.Element,
-                 jptr: JSONPointer = "") -> ObjectValue:
+                 jptr: JSONPointer = "", isroot: bool = False) -> ObjectValue:
         res = ObjectValue()
         if isinstance(self, RpcActionNode) and jptr == "":
             self._process_xmlobj_child(res, None, rval, jptr)
@@ -1034,7 +1034,7 @@ class TerminalNode(SchemaNode):
                 else self.type.units)
 
     def from_raw(self, rval: RawScalar,
-                 jptr: JSONPointer = "") -> ScalarValue:
+                 jptr: JSONPointer = "", isroot: bool = False) -> ScalarValue:
         """Override the superclass method."""
         res = self.type.from_raw(rval)
         if res is None:
