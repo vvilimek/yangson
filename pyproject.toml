@@ -24,6 +24,7 @@ python = ">=3.10,<4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"
+mypy = "^1.16.1"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^7.2.6"
