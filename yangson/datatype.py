@@ -65,7 +65,7 @@ from .typealiases import (InstanceIdentifier, L, N, RN, QualName, RawScalar,
                           RS, S, ScalarValue, YangIdentifier)
 from .xpathparser import Expr, XPathParser
 if TYPE_CHECKING:
-    from .schemanode import TerminalNode
+    from .schemanode import TerminalNode, SchemaNode
 
 
 class DataType(ABC, Generic[S, RS]):
@@ -90,6 +90,7 @@ class DataType(ABC, Generic[S, RS]):
         If the result is ``False``, set also `error_tag` and `error_message`
         properties.
         """
+        ...
 
     def __str__(self):
         """Return YANG name of the receiver type."""
@@ -682,13 +683,20 @@ class LeafrefType(LinkType[ScalarValue, RawScalar]):
 class InstanceIdentifierType(LinkType[InstanceRoute, InstanceIdentifier]):
     """Class representing YANG "instance-identifier" type."""
 
-    def __str__(self):
+    def __init__(self: "InstanceIdentifierType", sctx: SchemaContext, name: Optional[YangIdentifier]) -> None:
+        super().__init__(sctx, name)
+        self.root: Optional[SchemaNode] = None
+        """XPath document root schema node."""
+
+    def __str__(self: "InstanceIdentifierType") -> str:
         return "instance-identifier"
 
-    def __contains__(self, val: InstanceRoute) -> bool:
-        return isinstance(val, InstanceRoute)
+    def __contains__(self: "InstanceIdentifierType", val: ScalarValue) -> bool:
+        # TODO: route = cast(InstanceRoute, val) [related to FIXME above]
+        node = self.root.get_schema_descendant(val.as_schema_route())
+        return node is not None
 
-    def yang_type(self) -> YangIdentifier:
+    def yang_type(self: "InstanceIdentifierType") -> YangIdentifier:
         """Override the superclass method."""
         return "instance-identifier"
 
@@ -719,6 +727,12 @@ class InstanceIdentifierType(LinkType[InstanceRoute, InstanceIdentifier]):
     @staticmethod
     def _deref(node: InstanceNode) -> list[InstanceNode]:
         return [node.top().goto(cast(InstanceRoute, node.value))]
+
+    def _post_process(self: "InstanceIdentifierType", tnode: "TerminalNode") -> None:
+        if tnode._y_data_struct:
+            self.root = tnode._y_data_struct
+        else:
+            self.root = tnode.schema_root()
 
 
 class IdentityrefType(DataType[QualName, YangIdentifier]):

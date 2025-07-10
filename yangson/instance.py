@@ -964,11 +964,7 @@ class ArrayEntry(InstanceNode):
         return ArrayEntry(self.index, self.before, self.after, newval,
                           self.parinst, self.schema_node, ts)
 
-<<<<<<< HEAD
-    def _instance_route_entry(self):
-=======
-    def _instance_route_entry(self: "ArrayEntry") -> "EntryKeys":
->>>>>>> 3d39a60 (Typing: Fix InstanceRoute annotations)
+    def _instance_route_entry(self) -> "EntryKeys":
         sn = self.schema_node
         if isinstance(sn, LeafListNode):
             return EntryValue(str(self.value))

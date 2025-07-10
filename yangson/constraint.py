@@ -152,3 +152,16 @@ class Must(Constraint):
         super().__init__(
             error_tag if error_tag else "must-violation", error_message)
         self.expression = expression
+
+    def check(self: "Must", ctx_root: "SchemaNode") -> bool:
+        """Test if must constraint does not reference nodes outside given context.
+        This function is useful when checking ietf-restconf:yang-data constraints.
+
+        Args:
+            ctx_root: XPath context root node.
+
+        Returns:
+            ``True`` if the references don't use nodes outside given context.
+        """
+
+        return self.expression.check(ctx_root)
