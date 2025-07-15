@@ -1105,6 +1105,25 @@ class SchemaTreeNode(GroupNode):
         """Override the superclass method."""
         return None
 
+    def from_xml(self: "SchemaTreeNode", rval: ET.Element, jptr: JSONPointer = "", isroot: bool = True) -> ObjectValue:
+        res = ObjectValue()
+        if rval.tag[0] == '{':
+            xmlns, name = rval.tag[1:].split('}')
+            nsmap = self.schema_data.modules_by_ns
+            if xmlns not in nsmap:
+                raise MissingModuleNamespace(xmlns)
+            ns = nsmap[xmlns].yang_id[0]
+            qn = (name, ns)
+        else:
+            #self.ns will not work
+            raise MissingModuleNamespace(xmlns) # TODO is this the correct exception?
+
+        for struct in filter(lambda n: isinstance(n, Structure), self.children):
+            if struct.qual_name == qn:
+                return struct.from_xml(rval, jptr, isroot)
+
+        return super().from_xml(rval, jptr, isroot)
+
     def as_schema_route(self: "SchemaTreeNode") -> SchemaRoute:
         """Override the superclass method."""
         return []
@@ -1457,10 +1476,10 @@ class Structure(DataNode, InternalNode):
         return None
 
     def from_raw(self: "Structure", rval: RawValue, jptr: JSONPointer = "") -> Value:
-        return AnydataNode.from_raw(self, rval, jptr)
+        return ContainerNode.from_raw(self, rval, jptr)
 
     def from_xml(self: "Structure", rval: ET.Element, jptr: JSONPointer = "", isroot: bool = False) -> Value:
-        return AnydataNode.from_xml(self, rval, jptr)
+        return ContainerNode.from_xml(self, rval, jptr)
 
     def _handle_substatements(self: "Structure", stmt: Statement, sctx: SchemaContext) -> None:
         for s in stmt.substatements:
@@ -1515,6 +1534,10 @@ class Structure(DataNode, InternalNode):
 
     def _tree_line_prefix(self: "Structure", ctype: bool) -> str:
         return "structure"
+
+    def _default_value(self: "Structure", inst: InstanceNode, ctype: ContentType,
+                       lazy: bool) -> InstanceNode:
+        return ContainerNode._default_value(self, inst, ctype, lazy)
 
 
 class SequenceNode(DataNode):
@@ -2074,6 +2097,9 @@ class RpcActionNode(SchemaTreeNode):
     def data_parent(self) -> None:
         """Override the superclass method."""
         return self.parent
+
+    def from_xml(self: "RpcActionNode", rval: ET.Element, jptr: JSONPointer = "", isroot: bool = False) -> Value:
+        return InternalNode.from_xml(self, rval, jptr, isroot)
 
     def _handle_substatements(self, stmt: Statement,
                               sctx: SchemaContext) -> None:
