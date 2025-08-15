@@ -65,7 +65,11 @@ class ModuleData:
 
     def __init__(self, main_module: ModuleId, yang_id: ModuleId) -> None:
         """Initialize the class instance."""
-        self.main_module = main_module
+        self.features: MutableSet[YangIdentifier] = set()
+        """Set of supported features."""
+        self.all_features: MutableSet[YangIdentifier] = set()
+        """Set of all features."""
+        self.main_module: ModuleId = main_module
         """Main module of the receiver."""
         self.yang_id = yang_id
         """Identifier of the Module, different from main_module
@@ -149,6 +153,8 @@ class SchemaData:
                         "yangson-yl:keep-obsolete"]
                 if "feature" in item:
                     mdata.features.update(item["feature"])
+                for ftr in mdata.statement.find_all("feature"):
+                    mdata.all_features.add(ftr.argument)
                 locpref = mod.find1("prefix", required=True).argument
                 mdata.prefix_map[locpref] = mid
                 if "submodule" in item:
