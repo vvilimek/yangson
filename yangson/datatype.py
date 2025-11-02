@@ -50,7 +50,7 @@ import decimal
 import xml.etree.ElementTree as ET
 import re
 from typing import (Any, cast, ClassVar, Generic, Optional, Type,
-                    TYPE_CHECKING)
+                    Union, TYPE_CHECKING)
 
 from .constraint import Intervals, Pattern
 from .exceptions import (
@@ -633,7 +633,15 @@ class LeafrefType(LinkType[ScalarValue, RawScalar]):
         """Initialize the class instance."""
         super().__init__(sctx, name)
 
-    def __contains__(self, val: ScalarValue) -> bool:
+    def _handle_properties(self: "LeafrefType", stmt: Statement, sctx: SchemaContext) -> None:
+        super()._handle_properties(stmt, sctx)
+        self.path = XPathParser(
+            stmt.find1("path", required=True).argument, sctx).parse()
+
+    def canonical_string(self: "LeafrefType", val: ScalarValue) -> Optional[str]:
+        return self.ref_type.canonical_string(val)
+
+    def __contains__(self, val: Union[ScalarValue, InstanceRoute]) -> bool:
         return val in self.ref_type
 
     def _handle_properties(self, stmt: Statement, sctx: SchemaContext) -> None:
@@ -691,7 +699,7 @@ class InstanceIdentifierType(LinkType[InstanceRoute, InstanceIdentifier]):
     def __str__(self: "InstanceIdentifierType") -> str:
         return "instance-identifier"
 
-    def __contains__(self: "InstanceIdentifierType", val: ScalarValue) -> bool:
+    def __contains__(self: "InstanceIdentifierType", val: InstanceRoute) -> bool:
         # TODO: route = cast(InstanceRoute, val) [related to FIXME above]
         node = self.root.get_schema_descendant(val.as_schema_route())
         return node is not None
@@ -1111,7 +1119,44 @@ class UnionType(DataType[ScalarValue, RawScalar]):
         super().__init__(sctx, name)
         self.types: list[DataType] = []
 
-    def __contains__(self, val: ScalarValue) -> bool:
+    def to_raw(self: "UnionType", val: ScalarValue) -> RawScalar:
+        for t in self.types:
+            if val in t:
+                return t.to_raw(val)
+
+    def to_xml(self: "UnionType", val: ScalarValue) -> RawScalar:
+        for t in self.types:
+            if val in t:
+                return t.to_xml(val)
+
+    def canonical_string(self: "UnionType", val: ScalarValue) -> Optional[str]:
+        for t in self.types:
+            if val in t:
+                return t.canonical_string(val)
+        return None
+
+    def parse_value(self: "UnionType", text: str) -> Optional[ScalarValue]:
+        for t in self.types:
+            val = t.parse_value(text)
+            if val is not None and val in t:
+                return val
+        return None
+
+    def from_raw(self: "UnionType", raw: RawScalar) -> Optional[ScalarValue]:
+        for t in self.types:
+            val = t.from_raw(raw)
+            if val is not None and val in t:
+                return val
+        return None
+
+    def from_xml(self: "UnionType", xml: ET.Element) -> Optional[ScalarValue]:
+        for t in self.types:
+            val = t.from_xml(xml)
+            if val is not None and val in t:
+                return val
+        return None
+
+    def __contains__(self, val: Union[ScalarValue, InstanceRoute]) -> bool:
         for t in self.types:
             try:
                 if val in t:
