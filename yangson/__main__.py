@@ -34,13 +34,11 @@ from yangson.exceptions import (
 from yangson.typealiases import PrefName
 
 
-def main(infile: Optional[str] = None, pickled: bool = False,
-         path: Optional[str] = None,
+def main(infile: Optional[str] = None, pickled: bool = False, path: Optional[str] = None,
          scope: ValidationScope = ValidationScope.all,
          ctype: ContentType = ContentType.all, set_id: bool = False,
          tree: bool = False, no_types: bool = False,
-         digest: bool = False, dump: Optional[str] = None,
-         subschema: Optional[PrefName] = None,
+         digest: bool = False, subschema: Optional[PrefName] = None,
          validate: Optional[str] = None) -> int:
     """Entry-point for the command-line utility.
 

@@ -99,7 +99,7 @@ YL8525 = """
 
 class ModuleData:
 
-    def __init__(self, val: ObjectValue) -> None:
+    def __init__(self: "ModuleData", rfc8525_entry: ArrayEntry) -> None:
         """Initialize the receiver."""
         self.name: str = val["name"]
         self.revision: str = val.get("revision", "")
@@ -143,10 +143,25 @@ class MainModuleData(ModuleData):
                     rev = ""
                 self.deviation.append((dmod.value, rev))
 
-    def add_submodule(self, sub_entry: ObjectValue):
-        """Add submodule defined in an RFC 8525 submodule entry."""
+    def add_submodule(self, sub_entry: ArrayEntry) -> None:
+        """Add or merge submodule defined in an RFC 8525 submodule entry."""
         smod = ModuleData(sub_entry)
-        self.submodule[smod.key()] = smod
+        key = smod.key()
+        if key in self.submodule:
+            self.submodule[key].merge(smod)
+        else:
+            self.submodule[key] = smod
+
+    def merge(self, other: ModuleData) -> None:
+        """Extend the superclass method."""
+        if not isinstance(other, MainModuleData):
+            raise ValueError("Expected MainModuleData, got ModuleData")
+        super().merge(other)
+        self.deviation |= other.deviation
+        self.feature |= other.feature
+        self.import_only = self.import_only or other.import_only
+        for sm in other.submodule:
+            self.add_submodule(sm)
 
     def as_raw(self) -> RawObject:
         """Extend the superclass method."""

@@ -76,6 +76,76 @@ class OutputFilter:
         return True
 
 
+class LinkedList:
+    """Persistent linked list of instance values."""
+
+    @classmethod
+    def from_list(cls, vals: list[Value] = [], reverse: bool = False) -> "LinkedList":
+        """Create an instance from a standard list.
+
+        Args:
+            vals: Python list of instance values.
+        """
+        res = EmptyList()
+        for v in (vals if reverse else vals[::-1]):
+            res = cls(v, res)
+        return res
+
+    def __init__(self: "LinkedList", head: Value, tail: "LinkedList") -> None:
+        """Initialize the class instance."""
+        self.head = head
+        """Head of the linked list."""
+        self.tail = tail
+        """Tail of the linked list."""
+
+    def __bool__(self: "LinkedList"):
+        """Return receiver's boolean value."""
+        return True
+
+    def __iter__(self: "LinkedList"):
+        """Iterate over receiver's entries."""
+        cdr = self
+        while True:
+            try:
+                n, cdr = cdr.pop()
+            except IndexError:
+                return
+            yield n
+
+    def cons(self: "LinkedList", val: Value) -> "LinkedList":
+        """Prepend a value to the receiver in the persistent way.
+
+        Args:
+            val: Instance value.
+
+        Returns: A new linked list.
+        """
+        return LinkedList(val, self)
+
+    def pop(self: "LinkedList") -> tuple[Value, "LinkedList"]:
+        """Deconstruct the receiver.
+
+        Returns: A tuple with receiver's head and tail, respectively.
+        """
+        return (self.head, self.tail)
+
+
+class EmptyList(LinkedList, metaclass=_Singleton):
+    """Singleton class representing the empty linked list."""
+
+    def __init__(self: "EmptyList") -> None:
+        pass
+
+    def __bool__(self: "EmptyList"):
+        return False
+
+    def __getitem__(self: "EmptyList", key):
+        raise IndexError
+
+    def pop(self: "EmptyList") -> None:
+        raise IndexError
+
+
 class InstanceNode:
     """YANG data node instance implemented as a zipper structure."""
     _key: InstanceKey
@@ -398,8 +468,7 @@ class InstanceNode:
         """
         self.schema_node._validate(self, scope, ctype)
 
-    def add_defaults(self, ctype: Optional[ContentType] = None,
-                     tag: bool = False) -> "InstanceNode":
+    def add_defaults(self: "InstanceNode", ctype: Optional[ContentType] = None, tag: bool = False) -> "InstanceNode":
         """Return the receiver with defaults added recursively to its value.
 
         Args:
@@ -511,8 +580,7 @@ class InstanceNode:
             return value
         return self.schema_node.type.to_raw(self.value)
 
-    def to_xml(self, filter: OutputFilter = OutputFilter(),
-               elem: ET.Element = None):
+    def to_xml(self: "InstanceNode", filter: OutputFilter = OutputFilter(), elem: Optional[ET.Element] = None) -> ET.Element:
         """put receiver's value into a XML element"""
         has_default_ns = False
 
@@ -652,8 +720,8 @@ class InstanceNode:
         """XPath - return the list of all receiver's nodes."""
         return list(self) if isinstance(self.value, ArrayValue) else [self]
 
-    def _children(self,
-                  qname: Union[QualName, bool] = None) -> list["InstanceNode"]:
+    def _children(self: "InstanceNode", qname:
+                  Union[QualName, bool, None] = None) -> list["InstanceNode"]:
         """XPath - return the list of receiver's children."""
         sn = self.schema_node
         if not isinstance(sn, InternalNode):
@@ -682,7 +750,7 @@ class InstanceNode:
             res.extend(wd._member(mn)._node_set())
         return res
 
-    def _descendants(self, qname: Union[QualName, bool] = None,
+    def _descendants(self: "InstanceNode", qname: Union[QualName, bool, None] = None,
                      with_self: bool = False) -> list["InstanceNode"]:
         """XPath - return the list of receiver's descendants."""
         res = ([] if not with_self or (qname and self.qual_name != qname)
@@ -695,13 +763,13 @@ class InstanceNode:
 
     def _preceding_siblings(
             self: "InstanceNode",
-            qname: Union[QualName, bool] = None) -> list["InstanceNode"]:
+            qname: Union[QualName, bool, None] = None) -> list["InstanceNode"]:
         """XPath - return the list of receiver's preceding-siblings."""
         return []
 
     def _following_siblings(
             self: "InstanceNode",
-            qname: Union[QualName, bool] = None) -> list["InstanceNode"]:
+            qname: Union[QualName, bool, None] = None) -> list["InstanceNode"]:
         """XPath - return the list of receiver's following-siblings."""
         return []
 
@@ -718,7 +786,7 @@ class InstanceNode:
 class RootNode(InstanceNode):
     """This class represents the root of the instance tree."""
 
-    def __init__(self, value: Value, schema_node: "SchemaTreeNode",
+    def __init__(self: "RootNode", value: Value, schema_node: "DataNode",
                  schema_data: "SchemaData", timestamp: datetime) -> None:
         super().__init__("/", value, None, schema_node, timestamp)
         self.schema_data = schema_data
@@ -738,10 +806,9 @@ class RootNode(InstanceNode):
         """
         raise NonexistentInstance(self, "up of top")
 
-    def to_xml(
-            self, filter: OutputFilter = OutputFilter(),
-            tag: str = "content-data",
-            urn: str = "urn:ietf:params:xml:ns:yang:ietf-yang-instance-data"):
+    def to_xml(self: "RootNode", filter: OutputFilter = OutputFilter(),
+               tag: str = "content-data",
+               urn: str = "urn:ietf:params:xml:ns:yang:ietf-yang-instance-data") -> ET.Element:
         """put receiver's value into a XML element"""
         element = ET.Element(tag)
         element.attrib['xmlns'] = urn
@@ -750,19 +817,17 @@ class RootNode(InstanceNode):
             return et[0]
         return et
 
-    def _copy(self, newval: Value, newts: datetime = None) -> InstanceNode:
-        return RootNode(newval, self.schema_node, self.schema_data,
-                        newts if newts else newval.timestamp)
+    def _copy(self: "RootNode", newval: Value, newts: Optional[datetime] = None) -> InstanceNode:
+        return RootNode(
+            newval, self.schema_node, self.schema_data, newts if newts else newval.timestamp)
 
     def _ancestors_or_self(
-            self: "RootNode",
-            qname: Union[QualName, bool] = None) -> list["RootNode"]:
+            self: "RootNode", qname: Union[QualName, bool, None] = None) -> list["RootNode"]:
         """XPath - return the list of receiver's ancestors including itself."""
         return [self] if qname is None else []
 
     def _ancestors(
-            self: "RootNode",
-            qname: Union[QualName, bool] = None) -> list["RootNode"]:
+            self: "RootNode", qname: Union[QualName, bool, None] = None) -> list["RootNode"]:
         """XPath - return the list of receiver's ancestors."""
         return []
 
@@ -811,7 +876,8 @@ class ObjectMember(InstanceNode):
         res[self.name] = self.value
         return res
 
-    def _copy(self, newval: Value, newts: datetime = None) -> "ObjectMember":
+    def _copy(self: "ObjectMember", newval: Value,
+              newts: Optional[datetime] = None) -> "ObjectMember":
         if newts:
             ts = newts
         elif isinstance(newval, StructuredValue):
@@ -846,7 +912,7 @@ class ArrayEntry(InstanceNode):
             self: "ArrayEntry", key: int, before: deque,
             after: deque, value: Value,
             parinst: Optional[InstanceNode],
-            schema_node: "DataNode", timestamp: datetime = None) -> None:
+            schema_node: "DataNode", timestamp: Optional[datetime] = None) -> None:
         super().__init__(key, value, parinst, schema_node, timestamp)
         self.before = before
         """Preceding entries of the parent array."""
@@ -966,7 +1032,7 @@ class ArrayEntry(InstanceNode):
         return ArrayEntry(self.index, self.before, self.after, newval,
                           self.parinst, self.schema_node, ts)
 
-    def _instance_route_entry(self):
+    def _instance_route_entry(self: "ArrayEntry") -> "EntryKeys":
         sn = self.schema_node
         if isinstance(sn, LeafListNode):
             return EntryValue(str(self.value))
@@ -1027,14 +1093,34 @@ class ArrayEntry(InstanceNode):
         return [self.up().up()]
 
 
+class InstanceRoute(list):
+    """This class represents a route into an instance value."""
+
+    def __str__(self: "InstanceRoute") -> str:
+        """Return instance-id as the string representation of the receiver."""
+        if self:
+            return "".join([str(c) for c in self])
+        else:
+            return "/"
+
+    def __hash__(self: "InstanceRoute") -> int:
+        """Return the hash value of the receiver."""
+        return self.__str__().__hash__()
+
+    def as_schema_route(self: "InstanceRoute") -> SchemaRoute:
+        """Get a SchemaNode from InstanceRoute.
+        This transformation removes all key values and leaf-list/list indices."""
+        sch_route = []
+        for mem_key in self:
+            if isinstance(mem_key, EntryKeys):
+                continue
+            sch_route.append(mem_key.as_qual_name())
+        return sch_route
+
 class MemberName:
     """Selectors of object members.
 
-    This class implements the InstanceRouteItem protocol.
-    """
-
-    def __init__(self, name: YangIdentifier,
-                 ns: Optional[YangIdentifier]) -> None:
+    def __init__(self: "MemberName", name: YangIdentifier, ns: Optional[YangIdentifier]) -> None:
         """Initialize the class instance.
 
         Args:
@@ -1065,6 +1151,9 @@ class MemberName:
     def goto_step(self, inst: InstanceNode) -> InstanceNode:
         return inst[self.iname()]
 
+    def as_qual_name(self: "MemberName") -> QualName:
+        """Get a QualName from MemberName."""
+        return (self.name, self.namespace)
 
 class ActionName(MemberName):
     """Name of an action (can appear in RESTCONF resource IDs).
@@ -1086,10 +1175,7 @@ class ActionName(MemberName):
 class EntryIndex:
     """Numeric selectors for a list or leaf-list entry.
 
-    This class implements the InstanceRouteItem protocol.
-    """
-
-    def __init__(self, index: int) -> None:
+    def __init__(self: "EntryIndex", index: int) -> None:
         """Initialize the class instance.
 
         Args:
@@ -1117,10 +1203,7 @@ class EntryIndex:
 class EntryValue:
     """Value-based selectors of an array entry.
 
-    This class implements the InstanceRouteItem protocol.
-    """
-
-    def __init__(self, value: str) -> None:
+    def __init__(self: "EntryValue", value: str) -> None:
         """Initialize the class instance.
 
         Args:
@@ -1165,8 +1248,7 @@ class EntryKeys:
 
     def __init__(
             self: "EntryKeys",
-            keys: dict[tuple[YangIdentifier, Optional[YangIdentifier]],
-                       str]) -> None:
+            keys: dict[tuple[YangIdentifier, Optional[YangIdentifier]], str]) -> None:
         """Initialize the class instance.
 
         Args:
@@ -1235,7 +1317,7 @@ class EntryKeys:
 class ResourceIdParser(Parser):
     """Parser for RESTCONF resource identifiers."""
 
-    def __init__(self, text: str, sn: "SchemaTreeNode") -> None:
+    def __init__(self: "ResourceIdParser", text: str, sn: "DataNode") -> None:
         """Extend the superclass method.
 
         Args:

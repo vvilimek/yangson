@@ -50,7 +50,7 @@ class Parser:
     ufloat_re = re.compile(fr"{_uint}(\.{_uint})?|\.{_uint}")
     """Regular expression for unsigned float."""
 
-    def __init__(self, text: str) -> None:
+    def __init__(self: "Parser", text: str) -> None:
         """Initialize the class instance.
 
         Args:

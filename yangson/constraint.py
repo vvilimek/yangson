@@ -27,17 +27,27 @@ This module implements the following classes:
 import re
 from typing import Callable, Generic, Optional
 from elementpath import RegexError, translate_pattern
+from typing import TYPE_CHECKING
 
 from .exceptions import InvalidArgument
 from .typealiases import N
 from .xpathast import Expr
 
+if TYPE_CHECKING:
+    from .schemanode import SchemaNode
+
+# Type aliases
+Number = Union[int, decimal.Decimal]
+"""Union of numeric classes appearing in interval constraints."""
+
+Interval = list[Number]
+"""Numeric interval consisting either of one number or a pair of bounds."""
+
 
 class Constraint:
     """Abstract class representing annotated YANG constraints."""
 
-    def __init__(self, error_tag: Optional[str],
-                 error_message: Optional[str]) -> None:
+    def __init__(self: "Constraint", error_tag: Optional[str], error_message: Optional[str]) -> None:
         """Initialize the class instance."""
         self.error_tag = error_tag
         self.error_message = error_message
@@ -54,16 +64,15 @@ class Intervals(Constraint, Generic[N]):
         except ValueError:
             return None
 
-    def __init__(self, intervals: list[list[N]],
-                 parser: Optional[Callable[[str], Optional[N]]] = None,
-                 error_tag: Optional[str] = None,
-                 error_message: Optional[str] = None) -> None:
+    def __init__(self: "Intervals", intervals: list[Interval],
+                 parser: Optional[Callable[[str], Optional[Number]]] = None,
+                 error_tag: Optional[str] = None, error_message: Optional[str] = None) -> None:
         """Initialize the class instance."""
         super().__init__(error_tag, error_message)
         self.intervals = intervals
         self.parser = parser if parser else Intervals.default_parser
 
-    def __contains__(self, value: N):
+    def __contains__(self: "Intervals", value: Number) -> bool:
         """Return ``True`` if the receiver contains the value."""
         for r in self.intervals:
             if len(r) == 1:
@@ -78,7 +87,7 @@ class Intervals(Constraint, Generic[N]):
         return " | ".join([f"{r[0]!s}..{r[-1]!s}" if len(r) > 1 else str(r[0])
                            for r in self.intervals])
 
-    def restrict_with(self, expr: str, error_tag: Optional[str] = None,
+    def restrict_with(self: "Intervals", expr: str, error_tag: Optional[str] = None,
                       error_message: Optional[str] = None) -> None:
         """Combine the receiver with new intervals.
 
@@ -126,7 +135,7 @@ class Intervals(Constraint, Generic[N]):
 class Pattern(Constraint):
     """Class representing regular expression pattern."""
 
-    def __init__(self, pattern: str, invert_match: bool = False,
+    def __init__(self: "Pattern", pattern: str, invert_match: bool = False,
                  error_tag: Optional[str] = None,
                  error_message: Optional[str] = None) -> None:
         """Initialize the class instance."""
@@ -146,9 +155,22 @@ class Pattern(Constraint):
 class Must(Constraint):
     """Class representing the constraint specified by a "must" statement."""
 
-    def __init__(self, expression: Expr, error_tag: Optional[str] = None,
+    def __init__(self: "Must", expression: Expr, error_tag: Optional[str] = None,
                  error_message: Optional[str] = None) -> None:
         """Initialize the class instance."""
         super().__init__(
             error_tag if error_tag else "must-violation", error_message)
         self.expression = expression
+
+    def check(self: "Must", ctx_root: "SchemaNode") -> bool:
+        """Test if must constraint does not reference nodes outside given context.
+        This function is useful when checking ietf-restconf:yang-data constraints.
+
+        Args:
+            ctx_root: XPath context root node.
+
+        Returns:
+            ``True`` if the references don't use nodes outside given context.
+        """
+
+        return self.expression.check(ctx_root)

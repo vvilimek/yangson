@@ -44,24 +44,24 @@ from collections import deque
 from collections.abc import MutableSet
 from datetime import datetime
 from itertools import product
-from typing import cast, Any, Optional
+from typing import Any, Optional, TYPE_CHECKING, NoReturn
 import xml.etree.ElementTree as ET
+import copy
 from .constraint import Must
-from .datatype import DataType, LinkType, IdentityrefType
+from .datatype import (DataType, LinkType, LeafrefType, UnionType,
+                       RawScalar, IdentityrefType, InstanceIdentifierType)
 from .enumerations import (Axis, ContentType, DefaultDeny,
                            NodeStatus, ValidationScope)
 from .exceptions import (
-    AnnotationTypeError, InvalidArgument,
+    AnnotationTypeError, InvalidXPath, InvalidLeafrefPath,
     MissingAnnotationTarget, MissingModuleNamespace, RawMemberError,
     RawTypeError, SchemaError, SemanticError, UndefinedAnnotation,
-    YangsonException, YangTypeError)
-from .instance import (ArrayEntry, InstanceNode, MemberName, ObjectMember)
-from .instroute import InstanceRoute
+    InvalidStatement, YangsonException, YangTypeError, InvalidArgument)
 from .instvalue import (
     ArrayValue, EntryValue, MetadataObject, ObjectValue, Value)
 from .schemadata import IdentityAdjacency, SchemaContext, SchemaData
-from .schpattern import (ChoicePattern, ConditionalPattern, Empty, Member,
-                         NotAllowed, Pair, SchemaPattern)
+from .schpattern import (Alternative, ChoicePattern, ConditionalPattern, Empty,
+                         Member, NotAllowed, Pair, SchemaPattern)
 from .statement import Statement
 from .typealiases import (DataPath, InstanceName, JSONPointer, QualName,
                           RawEntry, RawList, RawObject, RawScalar, RawValue,
@@ -74,8 +74,7 @@ from .xpathparser import XPathParser
 class Annotation:
     """Class for metadata annotations [RFC 7952]."""
 
-    def __init__(
-            self, type: DataType, description: Optional[str] = None) -> None:
+    def __init__(self: "Annotation", type: DataType, description: Optional[str] = None):
         """Initialize the class instance."""
         self.type = type
         self.description = description
@@ -103,6 +102,8 @@ class SchemaNode:
         """Content type of the receiver."""
         self._status = None
         """Status of node definition."""
+        self._y_data_struct = None # type: YangData
+        """Reference to either YangData or Structure schema node."""
 
     @property
     def qual_name(self) -> QualName:
@@ -197,7 +198,13 @@ class SchemaNode:
         """
         raise NotImplementedError
 
-    def clear_val_counters(self) -> None:
+    def as_schema_route(self: "SchemaNode") -> SchemaRoute:
+        """Get a schema route from schema node receiver."""
+        route = self.parent.as_schema_route()
+        route.append(self.qual_name)
+        return route
+
+    def clear_val_counters(self: "SchemaNode") -> None:
         """Clear receiver's validation counter."""
         self.val_count = 0
 
@@ -296,7 +303,7 @@ class SchemaNode:
             return lft._follow_leafref(xpath.right, init)
         elif isinstance(xpath, Step):
             if xpath.axis == Axis.parent:
-                if isinstance(self, SchemaTreeNode):
+                if isinstance(self, (SchemaTreeNode, YangData)):
                     return None
                 return self.data_parent() or self.schema_root()
             elif xpath.axis == Axis.child:
@@ -375,17 +382,22 @@ class SchemaNode:
         elif action in ("add", "replace"):
             self._mandatory_stmt(stmt, sctx)
 
-    def _post_process(self) -> None:
-        pass
+    def _post_process(self: "SchemaNode") -> None:
+        root = self._y_data_struct if self._y_data_struct else self.schema_root()
+        if self.when is not None and not self.when.check(self):
+            raise InvalidXPath("XPath expression references nodes outside XPath document.")
+        for mst in self.must:
+            if not mst.check(self):
+                raise InvalidXPath("XPath expression references nodes outside XPath document.")
 
     def _is_identityref(self) -> bool:
         return False
 
-    def _tree_line(self, no_type: bool = False) -> str:
+    def _tree_line(self: "SchemaNode", no_type: bool = False, ctype: bool = True) -> str:
         """Return the receiver's contribution to tree diagram."""
-        return f"{self._tree_line_prefix()} {self._tree_name()}"
+        return f"{self._tree_line_prefix(ctype)} {self._tree_name()}"
 
-    def _tree_line_prefix(self) -> str:
+    def _tree_line_prefix(self: "SchemaNode", ctype: bool) -> str:
         return self.status.value + "--"
 
     def _nacm_default_deny_stmt(self, stmt: Statement,
@@ -397,6 +409,16 @@ class SchemaNode:
             self.default_deny = DefaultDeny.all
         elif stmt.keyword == "default-deny-write":
             self.default_deny = DefaultDeny.write
+
+    def _rc_yang_data_stmt(self: "SchemaNode", stmt: Statement, sctx: SchemaContext) -> None:
+        # ietf-restconf:yang-data statements are ignore unless they appear on module/submodule toplevel
+        pass
+
+    def _sx_structure_stmt(self: "SchemaNode", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("ietf-yang-structure-ext:structure") # TODO better message
+
+    def _sx_augment_structure_stmt(self: "SchemaNode", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("ietf-yang-structure-ext:structure") # TODO better message
 
     _stmt_callback = {
         "action": "_rpc_action_stmt",
@@ -410,7 +432,10 @@ class SchemaNode:
         "identity": "_identity_stmt",
         "ietf-netconf-acm:default-deny-all": "_nacm_default_deny_stmt",
         "ietf-netconf-acm:default-deny-write": "_nacm_default_deny_stmt",
+        "ietf-restconf:yang-data": "_rc_yang_data_stmt",
         "ietf-yang-metadata:annotation": "_annotation_stmt",
+        "ietf-yang-structure-ext:structure": "_sx_structure_stmt",
+        "ietf-yang-structure-ext:augment-structure": "_sx_augment_structure_stmt",
         "input": "_input_stmt",
         "key": "_key_stmt",
         "leaf": "_leaf_stmt",
@@ -560,8 +585,7 @@ class InternalNode(SchemaNode):
                 res[iname] = ch.from_raw(rval[qn], npath)
         return res
 
-    def from_xml(self, rval: ET.Element,
-                 jptr: JSONPointer = "") -> ObjectValue:
+    def from_xml(self: "InternalNode", rval: ET.Element, jptr: JSONPointer = "", isroot: bool = False) -> ObjectValue:
         res = ObjectValue()
         if isinstance(self, RpcActionNode) and jptr == "":
             self._process_xmlobj_child(res, None, rval, jptr)
@@ -601,7 +625,7 @@ class InternalNode(SchemaNode):
             iname = '{1}:{0}'.format(*ch.qual_name)
         if isinstance(ch, SequenceNode):
             if iname not in res:
-                res[iname] = ch.from_xml(rval, npath, fqn)
+                res[iname] = ch.from_xml(rval, npath, tagname=fqn)
         else:
             res[iname] = ch.from_xml(xmlchild, npath)
 
@@ -641,6 +665,8 @@ class InternalNode(SchemaNode):
 
     def _add_child(self, node: SchemaNode) -> None:
         node.parent = self
+        if node._y_data_struct is None:
+            node._y_data_struct = self._y_data_struct
         self.children.append(node)
 
     def _child_inst_names(self) -> set[InstanceName]:
@@ -675,14 +701,25 @@ class InternalNode(SchemaNode):
 
     def _schema_pattern(self) -> SchemaPattern:
         todo = [c for c in self.children if not (
-            isinstance(c, (RpcActionNode, NotificationNode)) or
+            isinstance(c, (RpcActionNode, NotificationNode, YangData)) or
             c._status == NodeStatus.obsolete)]
-        if not todo:
+        yd = [c for c in self.children if isinstance(c, YangData)
+            and not c._status == NodeStatus.obsolete]
+        if yd:
+            ydprev = yd[0]._pattern_entry()
+            for c in yd[1:]:
+                ydprev = Alternative.combine(c._pattern_entry(), ydprev)
+        if not todo and yd:
+            return ydprev
+        elif not todo:
             return Empty()
-        prev = todo[0]._pattern_entry()
-        for c in todo[1:]:
-            prev = Pair(c._pattern_entry(), prev)
-        return ConditionalPattern(prev, self.when) if self.when else prev
+        elif todo:
+            prev = todo[0]._pattern_entry()
+            for c in todo[1:]:
+                prev = Pair(c._pattern_entry(), prev)
+
+        cp = ConditionalPattern(prev, self.when) if self.when else prev
+        return Alternative.combine(cp, ydprev) if yd else cp
 
     def _post_process(self) -> None:
         super()._post_process()
@@ -716,7 +753,9 @@ class InternalNode(SchemaNode):
     def _handle_child(self, node: SchemaNode, stmt: Statement,
                       sctx: SchemaContext) -> None:
         """Add child node to the receiver and handle substatements."""
-        if not sctx.schema_data.if_features(stmt, sctx.text_mid):
+        if not sctx.schema_data.if_features(stmt, sctx.text_mid) and \
+                not isinstance(self._y_data_struct, YangData):
+            # ietf-restconf:yang-data ignores if-feature statements
             return
         node.name = stmt.argument
         node.ns = sctx.default_ns
@@ -727,12 +766,20 @@ class InternalNode(SchemaNode):
     def _augment_stmt(self, stmt: Statement,
                       sctx: SchemaContext) -> None:
         """Handle **augment** statement."""
+        # TODO augmenting YangData is forbidden
         if not sctx.schema_data.if_features(stmt, sctx.text_mid):
+            # and \
+            #not isinstance(self._y_data_struct, YangData):
+            # ietf-restconf:yang-data ignores if-feature statements
             return
         target = self.get_schema_descendant(
             sctx.schema_data.sni2route(stmt.argument, sctx))
         if target is None:      # silently ignore missing target
             return
+        if isinstance(target._y_data_struct, YangData):
+            raise InvalidArgument("It is invalid to use 'augment' statement on ietf-restconf:yang-data.")
+        if isinstance(target._y_data_struct, Structure):
+            raise InvalidArgument("It is invalid to use 'augment' statement on ietf-yang-structure-ext:structure.")
         if stmt.find1("when"):
             gr = GroupNode()
             target._add_child(gr)
@@ -755,14 +802,20 @@ class InternalNode(SchemaNode):
             sctx.schema_data.sni2route(stmt.argument, sctx))
         if not target:
             return
-        if not sctx.schema_data.if_features(stmt, sctx.text_mid):
+        # TODO refining YangData is forbidden
+        if not sctx.schema_data.if_features(stmt, sctx.text_mid) and \
+                not isinstance(self._y_data_struct, YangData):
+            # ietf-restconf:yang-data ignores if-feature statements
             target.parent.children.remove(target)
         else:
             target._handle_substatements(stmt, sctx)
 
     def _uses_stmt(self, stmt: Statement, sctx: SchemaContext) -> None:
         """Handle uses statement."""
-        if not sctx.schema_data.if_features(stmt, sctx.text_mid):
+        # TODO is it possible to have if-feature here for YangData
+        if not sctx.schema_data.if_features(stmt, sctx.text_mid) and \
+                not isinstance(self._y_data_struct, YangData):
+            # ietf-restconf:yang-data ignores if-feature statements
             return
         grp, gid = sctx.schema_data.get_definition(stmt, sctx)
         wst = stmt.find1("when")
@@ -788,7 +841,10 @@ class InternalNode(SchemaNode):
 
     def _identity_stmt(self, stmt: Statement, sctx: SchemaContext) -> None:
         """Handle identity statement."""
-        if not sctx.schema_data.if_features(stmt, sctx.text_mid):
+        if not sctx.schema_data.if_features(stmt, sctx.text_mid) and \
+                not isinstance(self._y_data_struct, YangData):
+            # TODO checking instance type is useless as identity_stmt can only occur on module/submodule toplevel.
+            # ietf-restconf:yang-data ignores if-feature statements
             return
         id = (stmt.argument, sctx.schema_data.namespace(sctx.text_mid))
         adj = sctx.schema_data.identity_adjs.setdefault(
@@ -839,7 +895,7 @@ class InternalNode(SchemaNode):
         """Handle anydata statement."""
         self._handle_child(AnydataNode(), stmt, sctx)
 
-    def _ascii_tree(self, indent: str, no_types: bool, val_count: bool) -> str:
+    def _ascii_tree(self: "InternalNode", indent: str, no_types: bool, val_count: bool, ctype: bool = True) -> str:
         """Return the receiver's subtree as ASCII art."""
         def suffix(sn):
             return f" {{{sn.val_count}}}\n" if val_count and isinstance(
@@ -847,15 +903,31 @@ class InternalNode(SchemaNode):
         if not self.children:
             return ""
         cs = []
-        for c in self.children:
+        for c in filter(lambda c: not isinstance(c, (YangData, Structure)), self.children):
             cs.extend(c._flatten())
         cs.sort(key=lambda x: x.qual_name)
+        # yang-data children
+        ydcs = []
+        for ydc in filter(lambda c: isinstance(c, YangData), self.children):
+            ydcs.append(ydc)
+        # structure children
+        scs = []
+        for sc in filter(lambda c: isinstance(c, Structure), self.children):
+            scs.append(sc)
         res = ""
         for c in cs[:-1]:
-            res += (indent + c._tree_line(no_types) + suffix(c) +
-                    c._ascii_tree(indent + "|  ", no_types, val_count))
-        return (res + indent + cs[-1]._tree_line(no_types) + suffix(cs[-1]) +
-                cs[-1]._ascii_tree(indent + "   ", no_types, val_count))
+            res += (indent + c._tree_line(no_types, ctype) + suffix(c) +
+                    c._ascii_tree(indent + "|  ", no_types, val_count, ctype))
+        if len(cs) > 0:
+            res += (indent + cs[-1]._tree_line(no_types, ctype) + suffix(cs[-1]) +
+                cs[-1]._ascii_tree(indent + "   ", no_types, val_count, ctype))
+        for ydc in ydcs:
+            res += (ydc._tree_line(no_types, False) + suffix(ydc) +
+                    ydc._ascii_tree(indent + "   ", no_types, val_count, False))
+        for sc in scs:
+            res += (sc._tree_line(no_types, False) + suffix(sc) +
+                sc._ascii_tree(indent + "   ", no_types, val_count, False))
+        return res
 
     def clear_val_counters(self) -> None:
         """Clear validation counters in the receiver and its subtree."""
@@ -888,11 +960,127 @@ class GroupNode(InternalNode):
             res.extend(c._flatten())
         return res
 
+class YangData(GroupNode):
+    """Standard ietf-restconf:yang-data node."""
+
+    # TODO parse more stricly presence, config, status, description, reference, ... stmts
+    # TODO test and fix optionality of list key stmt
+    # TODO from_raw, from_xml
+    # TODO ascii tree printing
+
+    def __init__(self: "YangData", sctx: Optional[SchemaContext] = None) -> None:
+        super().__init__()
+        self._ctype = ContentType.all
+        self.context = sctx
+        self._y_data_struct = self
+
+    def data_parent(self: "YangData") -> Optional["InternalNode"]:
+        return None
+
+    def from_raw(self: "YangData", rval: RawValue, jptr: JSONPointer = "") -> Value:
+        # TODO prepend /self.qname/ to jptr?
+        return self.children[0].from_raw(rval, jptr)
+
+    def from_xml(self: "YangData", rval: ET.Element, jptr: JSONPointer = "", isroot: bool = False) -> Value:
+        # TODO prepend /self.qname/ to jptr?
+        return self.children[0].from_xml(rval, jptr)
+
+    def as_schema_route(self: "YangData") -> SchemaRoute:
+        """Get a schema route from schema node receiver."""
+        return []
+
+    def _container_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        super()._container_stmt(stmt, sctx)
+
+    def _uses_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        super()._uses_stmt(stmt, sctx)
+
+    def _handle_substatements(self: "YangData", stmt: Statement,
+                              sctx: SchemaContext) -> None:
+        for s in stmt.substatements:
+            # TODO: fix behaviour around: _augment_stmt, _deviation_stmt
+            if s.keyword in ("augment", "deviation", "extension", "feature", "grouping", "typedef"):
+                raise InvalidStatement("ietf-restconf:yang-data allows only statements from 'data-def-stmt' ABNF rule.")
+
+        super()._handle_substatements(stmt, sctx)
+
+    def _identity_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("ietf-restconf:yang-data allows only statements from 'data-def-stmt' ABNF rule.")
+
+    def _rpc_action_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("ietf-restconf:yang-data allows only statements from 'data-def-stmt' ABNF rule.")
+
+    def _notification_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("ietf-restconf:yang-data allows only statements from 'data-def-stmt' ABNF rule.")
+
+    def _leaf_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("ietf-restconf:yang-data allows only a single container data node child.")
+
+    def _leaf_list_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("ietf-restconf:yang-data allows only a single container data node child.")
+
+    def _list_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("ietf-restconf:yang-data allows only a single container data node child.")
+
+    def _augment_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        # is not called for some reason
+        raise InvalidStatement("ietf-restconf:yang-data allows only statements from 'data-def-stmt' ABNF rule.")
+
+    def _deviation_stmt(self: "YangData", stmt: Statement, sctx: SchemaContext) -> None:
+        # is not called for same reason
+        raise InvalidStatement("ietf-restconf:yang-data allows only statemets fro 'data-def-stmt' ABNF rule.")
+
+    def _post_process(self: "YangData") -> None:
+        if len(self.children) != 1 or not isinstance(self.children[0], ContainerNode):
+            raise InvalidStatement("ietf-restconf:yang-data allows only a single container data node child.")
+
+        def set_ctype(node):
+            node._ctype = None
+            if isinstance(node, InternalNode):
+                for c in node.children:
+                    set_ctype(c)
+
+        set_ctype(self)
+        self.children[0]._post_process()
+
+        stn = self.parent
+        for c in stn.children:
+            if c == self:
+                continue
+
+            if isinstance(c, YangData) and c.children[0].name == self.children[0].name:
+                raise InvalidArgument("ietf-restconf:yang-data container names collide.")
+
+            elif c.name == self.children[0].name:
+                raise InvalidArgument("ietf-restconf:yang-data container and toplevel container names collide.")
+
+    def _schema_pattern(self: "YangData") -> SchemaPattern:
+        return self._pattern_entry()
+
+    def _pattern_entry(self: "YangData") -> SchemaPattern:
+        return Member(self.children[0].iname(), ContentType.all, self.children[0].when)
+
+    def _flatten(self: "YangData") -> list["SchemaNode"]:
+        return [self]
+
+    def _ascii_tree(self: "YangData", indent: str, no_types: bool, val_count: bool, ctype: bool = True) -> str:
+        def suffix(sn):
+            return f" {{{sn.val_count}}}\n" if val_count else "\n"
+        if not self.children:
+            return ""
+
+        c = self.children[0]
+        return (indent + c._tree_line(no_types, False) + suffix(c) +
+                c._ascii_tree(indent + "   ", no_types, val_count, False))
+
+    def _tree_line_prefix(self: "YangData", ctype: bool) -> str:
+        return "yang-data"
+
 
 class SchemaTreeNode(GroupNode):
     """Root node of a schema tree."""
 
-    def __init__(self, schemadata: Optional[SchemaData] = None) -> None:
+    def __init__(self: "SchemaTreeNode", schemadata: Optional[SchemaData] = None) -> None:
         """Initialize the class instance."""
         super().__init__()
         self.annotations: dict[QualName, Annotation] = {}
@@ -907,14 +1095,97 @@ class SchemaTreeNode(GroupNode):
         """Override the superclass method."""
         return None
 
-    def _annotation_stmt(self, stmt: Statement, sctx: SchemaContext) -> None:
+    def from_xml(self: "SchemaTreeNode", rval: ET.Element, jptr: JSONPointer = "", isroot: bool = True) -> ObjectValue:
+        res = ObjectValue()
+        if rval.tag[0] == '{':
+            xmlns, name = rval.tag[1:].split('}')
+            nsmap = self.schema_data.modules_by_ns
+            if xmlns not in nsmap:
+                raise MissingModuleNamespace(xmlns)
+            ns = nsmap[xmlns].yang_id[0]
+            qn = (name, ns)
+        else:
+            #self.ns will not work
+            raise MissingModuleNamespace(xmlns) # TODO is this the correct exception?
+
+        for struct in filter(lambda n: isinstance(n, Structure), self.children):
+            if struct.qual_name == qn:
+                return struct.from_xml(rval, jptr, isroot)
+
+        return super().from_xml(rval, jptr, isroot)
+
+    def as_schema_route(self: "SchemaTreeNode") -> SchemaRoute:
+        """Override the superclass method."""
+        return []
+
+    def _annotation_stmt(self: "SchemaTreeNode", stmt: Statement, sctx: SchemaContext) -> None:
         """Handle annotation statement."""
         if not sctx.schema_data.if_features(stmt, sctx.text_mid):
             return
         dst = stmt.find1("description")
-        self.annotations[(stmt.argument, sctx.default_ns)] = Annotation(
+        ann = Annotation(
             DataType._resolve_type(stmt.find1("type", required=True), sctx),
             dst.argument if dst else None)
+        if isinstance(ann.type, InstanceIdentifierType):
+            ann.type.root = self
+        self.annotations[(stmt.argument, sctx.default_ns)] = ann
+
+    def _rc_yang_data_stmt(self: "SchemaTreeNode", stmt: Statement, sctx: SchemaContext) -> None:
+        """Handle the ietf-restconf:yang-data statement."""
+        yd_sch_data = copy.copy(sctx.schema_data)
+        # We cannot afford to use SchemaData constructor as it requires YANG Library as dict
+        sd = sctx.schema_data
+        main_mod: ModuleData = sd.modules[sctx.text_mid]
+        accessible_mods: list[ModuleId] = []
+        mod_stack: list[ModuleData] = []
+        mod_stack.append(main_mod)
+        while len(mod_stack) > 0:
+            mod = mod_stack.pop()
+            accessible_mods.append(mod.main_module)
+            accessible_mods.extend(mod.submodules)
+            for imported_mod in mod.prefix_map.values():
+                if imported_mod in accessible_mods:
+                    continue
+                mod_stack.append(sd.modules[imported_mod])
+
+        yd_sch_data.modules = {mid: mod_data for (mid, mod_data) in sd.modules.items() if mid in accessible_mods}
+
+        accessible_names = list(map(lambda mid: mid[0], accessible_mods))
+        yd_sch_data.identity_adjs = sd.identity_adjs
+        #yd_sch_data.identity_adjs = {qn: ident for (qn, ident) in sd.identity_adjs if qn[1] in accessible_names}
+        yd_sch_data.modules_by_name = {name: mod_data for (name, mod_data) in sd.modules_by_name.items()
+                                       if name in accessible_names}
+        namespaces = [mod_data.xml_namespace for mod_data in yd_sch_data.modules.values()]
+        yd_sch_data.modules_by_ns = {ns: mod_data for (ns, mod_data) in sd.modules_by_ns.items() if ns in namespaces}
+        #  TODO the _module_sequence is built in online fashion meaning it most likely contain only prefix of final schema_data._module_sequence
+        yd_sch_data._module_sequence = [mod for mod in yd_sch_data._module_sequence if mod in accessible_mods]
+
+        # The if-feature statement are to be ignored, we simply enable all possible feature
+        yd_sctx = SchemaContext(yd_sch_data, sctx.default_ns, sctx.text_mid)
+        yang_data = YangData(yd_sctx)
+        self._handle_child(yang_data, stmt, yd_sctx)
+
+    def _sx_structure_stmt(self: "SchemaTreeNode", stmt: Statement, sctx: SchemaContext) -> None:
+        """Handle the ietf-yang-structure-ext:structure statement."""
+        struct = Structure()
+        self._handle_child(struct, stmt, sctx)
+
+    def _sx_augment_structure_stmt(self: "SchemaTreeNode", stmt: Statement, sctx: SchemaContext) -> None:
+        """Handle the ietf-yang-structure-ext:augment-structure statement."""
+        #raise NotImplementedError
+        if not sctx.schema_data.if_features(stmt, sctx.text_mid):
+            return
+        target = self.get_schema_descendant(
+                sctx.schema_data.sni2route(stmt.argument, sctx))
+        if target is None:      # silently ignore missing target
+            return
+        if not isinstance(target._y_data_struct, Structure):
+            raise InvalidArgument("It is invalid to use 'augment-structure' statement on non ietf-yang-structure-ext:structure.")
+        if stmt.find1("when"):
+            gr = GroupNode()
+            target._add_child(gr)
+            target = grp
+        target._handle_substatements(stmt, sctx)
 
 
 class DataNode(SchemaNode):
@@ -999,9 +1270,12 @@ class DataNode(SchemaNode):
         return m if (self.mandatory and self._status !=
                      NodeStatus.deprecated) else SchemaPattern.optional(m)
 
-    def _tree_line_prefix(self) -> str:
-        return super()._tree_line_prefix() + (
-            "ro" if self.content_type() == ContentType.nonconfig else "rw")
+    def _tree_line_prefix(self: "DataNode", ctype: bool) -> str:
+        if ctype:
+            return super()._tree_line_prefix(ctype) + (
+                "ro" if self.content_type() == ContentType.nonconfig else "rw")
+        else:
+            return super()._tree_line_prefix(ctype)
 
 
 class TerminalNode(SchemaNode):
@@ -1027,8 +1301,8 @@ class TerminalNode(SchemaNode):
         return (self._units if self._units is not None
                 else self.type.units)
 
-    def from_raw(self, rval: RawScalar,
-                 jptr: JSONPointer = "") -> ScalarValue:
+    def from_raw(self: "TerminalNode", rval: RawScalar,
+                 jptr: JSONPointer = "", isroot: bool = False) -> ScalarValue:
         """Override the superclass method."""
         res = self.type.from_raw(rval)
         if res is None:
@@ -1045,6 +1319,8 @@ class TerminalNode(SchemaNode):
                       sctx: SchemaContext, action: str) -> None:
         if action == "replace":
             self.type = DataType._resolve_type(stmt, sctx)
+            # TODO Structure: handle situation when deviation of node with _y_data_struct.
+            # For ietf-restconf:yang-data is deviation forbidden, so it is not needed.
 
     def _node_digest(self) -> dict[str, Any]:
         res = super()._node_digest()
@@ -1091,12 +1367,25 @@ class TerminalNode(SchemaNode):
 
     def _post_process(self) -> None:
         super()._post_process()
+        root = self._y_data_struct if self._y_data_struct is not None else self.schema_root()
         self.type._post_process(self)
+        if isinstance(self.type, InstanceIdentifierType):
+            # Populate the instance-identifier document root restricting accessible nodes.
+            self.type.root = root
+        elif isinstance(self.type, LeafrefType) and not self.type.path.check(self):
+            raise InvalidLeafrefPath("The 'path' references schema node outside the XPath context.")
+        elif isinstance(self.type, UnionType):
+            for t in self.type.types:
+                assert not isinstance(t, UnionType)
+                if isinstance(t, InstanceIdentifierType):
+                    t.root = root
+                elif isinstance(t, LeafrefType) and not self.type.path.check(self):
+                    raise InvalidLeafrefPath("The 'path' statement references schema node outside the XPath context.")
 
     def _is_identityref(self) -> bool:
         return isinstance(self.type, IdentityrefType)
 
-    def _ascii_tree(self, indent: str, no_types: bool, val_count: bool) -> str:
+    def _ascii_tree(self: "TerminalNode", indent: str, no_types: bool, val_count: bool, ctype: bool = True) -> str:
         return ""
 
     def _state_roots(self) -> list[SchemaNode]:
@@ -1156,9 +1445,89 @@ class ContainerNode(DataNode, InternalNode):
     def _presence_stmt(self, stmt: Statement, sctx: SchemaContext) -> None:
         self.presence = True
 
-    def _tree_line(self, no_type: bool = False) -> str:
+    def _tree_line(self: "ContainerNode", no_type: bool = False, ctype: bool = True) -> str:
         """Return the receiver's contribution to tree diagram."""
-        return super()._tree_line() + ("!" if self.presence else "")
+        return super()._tree_line(no_type, ctype) + ("!" if self.presence else "")
+
+
+class Structure(DataNode, InternalNode):
+    """ietf-yang-structure-ext:structure node."""
+
+    # TODO strict substatement parsing
+    # test and fix optinoality of list key stmt
+    # TODO from_raw, from_xml
+    def __init__(self: "Structure", sctx: Optional[SchemaContext] = None) -> None:
+        super().__init__()
+        self._ctype = ContentType.all
+        self.context = sctx
+        self._y_data_struct = self
+
+    def data_parent(self: "Structure") -> Optional["InternalNode"]:
+        return None
+
+    def from_raw(self: "Structure", rval: RawValue, jptr: JSONPointer = "") -> Value:
+        return ContainerNode.from_raw(self, rval, jptr)
+
+    def from_xml(self: "Structure", rval: ET.Element, jptr: JSONPointer = "", isroot: bool = False) -> Value:
+        return ContainerNode.from_xml(self, rval, jptr)
+
+    def _handle_substatements(self: "Structure", stmt: Statement, sctx: SchemaContext) -> None:
+        for s in stmt.substatements:
+            if s.keyword in ("deviation", "extension", "if-feature", "feature"):
+                raise InvalidStatement()
+
+        super()._handle_substatements(stmt, sctx)
+
+    def _when_stmt(self: "Structure", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("when")
+
+    def _presence_stmt(self: "Structure", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("presence")
+
+    def _config_stmt(self: "Structure", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("config")
+
+    def _rpc_action_stmt(self: "Structure", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("action")
+
+    def _notification_stmt(self: "Structure", stmt: Statement, sctx: SchemaContext) -> None:
+        raise InvalidStatement("notification")
+
+    def _post_process(self: "Structure") -> None:
+        def set_ctype(node):
+            node._ctype = None
+            if isinstance(node, InternalNode):
+                for c in node.children:
+                    set_ctype(c)
+
+        set_ctype(self)
+        super()._post_process()
+
+    def _flatten(self: "Structure") -> list["SchemaNode"]:
+        return [self]
+
+    def _ascii_tree(self: "Structure", indent: str, no_types: bool, val_count: bool, ctype: bool = True) -> str:
+        """Return the receiver's subtree as ASCII art."""
+        def suffix(sn):
+            return f" {{{sn.val_count}}}" if val_count else "\n"
+        if not self.children:
+            return ""
+        cs = []
+        for c in self.children:
+            cs.extend(c._flatten())
+        res = ""
+        for c in cs[:-1]:
+            res += (indent + c._tree_line(no_types, False) + suffix(c) +
+                    c._ascii_tree(indent + "|  ", no_types, val_count, False))
+        return (res + indent + cs[-1]._tree_line(no_types, False) + suffix(cs[-1]) +
+                cs[-1]._ascii_tree(indent + "   ", no_types, val_count, False))
+
+    def _tree_line_prefix(self: "Structure", ctype: bool) -> str:
+        return "structure"
+
+    def _default_value(self: "Structure", inst: InstanceNode, ctype: ContentType,
+                       lazy: bool) -> InstanceNode:
+        return ContainerNode._default_value(self, inst, ctype, lazy)
 
 
 class SequenceNode(DataNode):
@@ -1231,9 +1600,9 @@ class SequenceNode(DataNode):
                          sctx: SchemaContext) -> None:
         self.user_ordered = stmt.argument == "user"
 
-    def _tree_line(self, no_type: bool = False) -> str:
+    def _tree_line(self: "SequenceNode", no_type: bool = False, ctype: bool = True) -> str:
         """Extend the superclass method."""
-        return super()._tree_line() + ("#" if self.user_ordered else "*")
+        return super()._tree_line(no_type, ctype) + ("#" if self.user_ordered else "*")
 
     def from_raw(self, rval: RawList,
                  jptr: JSONPointer = "") -> ArrayValue:
@@ -1256,8 +1625,8 @@ class SequenceNode(DataNode):
             idx = idx + 1
         return res
 
-    def from_xml(self, rval: ET.Element, jptr: JSONPointer = "",
-                 tagname: str = None, isroot: bool = False) -> ArrayValue:
+    def from_xml(self: "SequenceNode", rval: ET.Element, jptr: JSONPointer = "",
+                 isroot: bool = False, tagname: Optional[str] = None) -> ArrayValue:
         res = ArrayValue()
         idx = 0
         if isroot:
@@ -1424,11 +1793,11 @@ class ListNode(SequenceNode, InternalNode):
                     del self.unique[i]
                     return
 
-    def _tree_line(self, no_type: bool = False) -> str:
+    def _tree_line(self: "ListNode", no_type: bool = False, ctype: bool = True) -> str:
         """Return the receiver's contribution to tree diagram."""
         keys = (" [" + " ".join([k[0] for k in self.keys]) + "]"
                 if self.keys else "")
-        return super()._tree_line() + keys
+        return super()._tree_line(no_type, ctype) + keys
 
     def orphan_entry(self, rval: RawObject) -> "ArrayEntry":
         """Return an isolated entry of the receiver.
@@ -1495,8 +1864,8 @@ class ChoiceNode(InternalNode):
         if self.mandatory:
             self.parent._add_mandatory_child(self)
 
-    def _tree_line_prefix(self) -> str:
-        return super()._tree_line_prefix() + (
+    def _tree_line_prefix(self: "ChoiceNode", ctype: bool) -> str:
+        return super()._tree_line_prefix(ctype) + (
             "ro" if self.content_type() == ContentType.nonconfig else "rw")
 
     def _handle_child(self, node: SchemaNode, stmt: Statement,
@@ -1521,9 +1890,9 @@ class ChoiceNode(InternalNode):
         elif action in ("add", "replace"):
             self._default_stmt(stmt, sctx)
 
-    def _tree_line(self, no_type: bool = False) -> str:
+    def _tree_line(self: "ChoiceNode", no_type: bool = False, ctype: bool = True) -> str:
         """Return the receiver's contribution to tree diagram."""
-        return f"{self._tree_line_prefix()} ({self._tree_name()})" \
+        return f"{self._tree_line_prefix(ctype)} ({self._tree_name()})" \
             f"{'' if self._mandatory else '?'}"
 
 
@@ -1533,9 +1902,9 @@ class CaseNode(InternalNode):
     def _pattern_entry(self) -> SchemaPattern:
         return super()._schema_pattern()
 
-    def _tree_line(self, no_type: bool = False) -> str:
+    def _tree_line(self: "CaseNode", no_type: bool = False, ctype: bool = True) -> str:
         """Return the receiver's contribution to tree diagram."""
-        return f"{self._tree_line_prefix()}:({self._tree_name()})"
+        return f"{self._tree_line_prefix(ctype)}:({self._tree_name()})"
 
 
 class LeafNode(DataNode, TerminalNode):
@@ -1567,8 +1936,8 @@ class LeafNode(DataNode, TerminalNode):
         elif self._default is not None:
             self._default = self.type.from_yang(self._default)
 
-    def _tree_line(self, no_type: bool = False) -> str:
-        res = super()._tree_line() + ("" if self._mandatory else "?")
+    def _tree_line(self: "LeafNode", no_type: bool = False, ctype: bool = True) -> str:
+        res = super()._tree_line(no_type, ctype) + ("" if self._mandatory else "?")
         return res if no_type else f"{res} <{self.type}>"
 
     def _default_stmt(self, stmt: Statement, sctx: SchemaContext) -> None:
@@ -1628,8 +1997,8 @@ class LeafListNode(SequenceNode, TerminalNode):
             self._default = ArrayValue(
                 [self.type.from_yang(v) for v in self._default])
 
-    def _tree_line(self, no_type: bool = False) -> str:
-        res = super()._tree_line()
+    def _tree_line(self: "LeafListNode", no_type: bool = False, ctype: bool = True) -> str:
+        res = super()._tree_line(no_type, ctype)
         return res if no_type else f"{res} <{self.type}>"
 
 
@@ -1681,10 +2050,10 @@ class AnyContentNode(DataNode):
                           lazy: bool = False) -> InstanceNode:
         return pnode
 
-    def _tree_line(self, no_type: bool = False) -> str:
-        return super()._tree_line() + ("" if self._mandatory else "?")
+    def _tree_line(self: "AnyContentNode", no_type: bool = False, ctype: bool = True) -> str:
+        return super()._tree_line(no_type, ctype) + ("" if self._mandatory else "?")
 
-    def _ascii_tree(self, indent: str, no_types: bool, val_count: bool) -> str:
+    def _ascii_tree(self: "AnyContentNode", indent: str, no_types: bool, val_count: bool, ctype: bool = True) -> str:
         return ""
 
     def _post_process(self) -> None:
@@ -1719,7 +2088,10 @@ class RpcActionNode(SchemaTreeNode):
         """Override the superclass method."""
         return self.parent
 
-    def _handle_substatements(self, stmt: Statement,
+    def from_xml(self: "RpcActionNode", rval: ET.Element, jptr: JSONPointer = "", isroot: bool = False) -> Value:
+        return InternalNode.from_xml(self, rval, jptr, isroot)
+
+    def _handle_substatements(self: "RpcActionNode", stmt: Statement,
                               sctx: SchemaContext) -> None:
         self._add_child(InputNode(sctx.default_ns))
         self._add_child(OutputNode(sctx.default_ns))
@@ -1728,8 +2100,8 @@ class RpcActionNode(SchemaTreeNode):
     def _flatten(self) -> list[SchemaNode]:
         return [self]
 
-    def _tree_line_prefix(self) -> str:
-        return super()._tree_line_prefix() + "-x"
+    def _tree_line_prefix(self: "RpcActionNode", ctype: bool) -> str:
+        return super()._tree_line_prefix(ctype) + "-x"
 
     def _input_stmt(self, stmt: Statement, sctx: SchemaContext) -> None:
         """Handle RPC or action input statement."""
@@ -1739,6 +2111,12 @@ class RpcActionNode(SchemaTreeNode):
         """Handle RPC or action output statement."""
         self.get_child("output")._handle_substatements(stmt, sctx)
 
+    def as_schema_route(self: "SchemaNode") -> SchemaRoute:
+        """Override superclass method."""
+        if self.parent:
+            return SchemaNode.as_schema_route(self)
+        else:
+            super().as_schema_route()
 
 class InputNode(InternalNode, DataNode):
     """RPC or action input node."""
@@ -1798,5 +2176,5 @@ class NotificationNode(SchemaTreeNode):
     def _flatten(self) -> list[SchemaNode]:
         return [self]
 
-    def _tree_line_prefix(self) -> str:
-        return super()._tree_line_prefix() + "-n"
+    def _tree_line_prefix(self: "NotificationNode", ctype: bool) -> str:
+        return super()._tree_line_prefix(ctype) + "-n"

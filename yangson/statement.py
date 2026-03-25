@@ -37,8 +37,10 @@ class Statement:
     _escape_table = str.maketrans({'"': '\\"', '\\': '\\\\'})
     """Table for translating characters to their escaped form."""
 
-    def __init__(self, kw: YangIdentifier, arg: Optional[str],
-                 pref: YangIdentifier = None) -> None:
+    def __init__(self: "Statement",
+                 kw: YangIdentifier,
+                 arg: Optional[str],
+                 pref: Optional[YangIdentifier] = None):
         """Initialize the class instance.
 
         Args:

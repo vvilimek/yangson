@@ -33,8 +33,7 @@ from .instance import InstanceIdParser, ResourceIdParser, RootNode
 from .instroute import InstanceRoute
 from .instvalue import ObjectValue
 from .schemadata import SchemaData, SchemaContext
-from .schemanode import (DataNode, InternalNode, RawObject, SchemaNode,
-                         SchemaTreeNode)
+from .schemanode import DataNode, SchemaTreeNode, RawObject, SchemaNode, YangData
 from .typealiases import DataPath, PrefName, SchemaPath
 
 
@@ -42,7 +41,7 @@ class DataModel:
     """Basic user-level entry point to Yangson library."""
 
     @classmethod
-    def from_file(cls, name: str, mod_path: Sequence[str] = (".",),
+    def from_file(cls, name: str, mod_path: tuple[str] = (".",),
                   description: Optional[str] = None) -> "DataModel":
         """Initialize the data model from a file with YANG library data.
 
@@ -61,7 +60,7 @@ class DataModel:
             yltxt = infile.read()
         return cls(yltxt, mod_path, description)
 
-    def __init__(self, yltxt: str, mod_path: Sequence[str] = (".",),
+    def __init__(self: "DataModel", yltxt: str, mod_path: tuple[str] = (".",),
                  description: Optional[str] = None) -> None:
         """Initialize the class instance.
 
@@ -87,6 +86,8 @@ class DataModel:
         self.schema = SchemaTreeNode(self.schema_data)
         self.schema._ctype = ContentType.all
         self._build_schema()
+        self._build_imported_idents()
+        self._restrict_yang_data_idents()
         self.schema.description = description if description else (
             "Data model ID: " +
             self.yang_library["ietf-yang-library:modules-state"]
@@ -101,7 +102,7 @@ class DataModel:
         fnames = sorted(["@".join(m) for m in self.schema_data.modules])
         return hashlib.sha1("".join(fnames).encode("ascii")).hexdigest()
 
-    def from_raw(self, robj: RawObject,
+    def from_raw(self: "DataModel", robj: RawObject,
                  subschema: Optional[PrefName] = None) -> RootNode:
         """Create an instance node from a raw data tree.
 
@@ -129,7 +130,7 @@ class DataModel:
         cooked = cast(ObjectValue, schema.from_raw(robj))
         return RootNode(cooked, schema, self.schema_data, cooked.timestamp)
 
-    def from_xml(self, root: ET.Element,
+    def from_xml(self: "DataModel", root: ET.Element,
                  subschema: Optional[PrefName] = None) -> RootNode:
         """Create an instance node from a raw data tree.
 
@@ -205,7 +206,7 @@ class DataModel:
         """
         return self.schema._ascii_tree("", no_types, val_count)
 
-    def clear_val_counters(self):
+    def clear_val_counters(self: "DataModel") -> None:
         """Clear validation counters in the entire schema tree."""
         self.schema.clear_val_counters()
 
@@ -244,3 +245,22 @@ class DataModel:
             for dev in mod.find_all("deviation"):
                 self.schema._deviation_stmt(dev, sctx)
         self.schema._post_process()
+
+    def _build_imported_idents(self: "DataModel") -> None:
+        for mid in self.schema_data._import_module_sequence:
+            if mid in self.schema_data._module_sequence:
+                continue
+            mod = self.schema_data.modules[mid].statement
+            for ident in mod.find_all("identity"):
+                sctx = SchemaContext(
+                    self.schema_data, self.schema_data.namespace(mid), mid)
+                self.schema._identity_stmt(ident, sctx)
+
+    def _restrict_yang_data_idents(self: "DataModel") -> None:
+        for c in self.schema.children:
+            if isinstance(c, YangData):
+                mod_seq = []
+                mod_set = {self.schema_data.modules_by_name[c.ns].main_module} | self.schema_data.modules_by_name[c.ns].submodules
+                SchemaData._find_module_import_sequence(self.schema_data, mod_set, mod_seq)
+                c.context.identity_adjs = {qn: ident for (qn, ident) in self.schema_data.identity_adjs.items()
+                                           if qn[1] in mod_seq}

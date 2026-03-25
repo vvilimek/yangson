@@ -65,7 +65,7 @@ from .typealiases import (InstanceIdentifier, L, N, RN, QualName, RawScalar,
                           RS, S, ScalarValue, YangIdentifier)
 from .xpathparser import Expr, XPathParser
 if TYPE_CHECKING:
-    from .schemanode import TerminalNode
+    from .schemanode import TerminalNode, SchemaNode
 
 
 class DataType(ABC, Generic[S, RS]):
@@ -74,7 +74,7 @@ class DataType(ABC, Generic[S, RS]):
     dtypes: ClassVar[dict[str, Type["DataType"]]]
     _option_template = '<option value="{}"{}>{}</option>'
 
-    def __init__(self, sctx: SchemaContext, name: Optional[YangIdentifier]) -> None:
+    def __init__(self: "DataType", sctx: SchemaContext, name: Optional[YangIdentifier]) -> None:
         """Initialize the class instance."""
         self.sctx = sctx
         self.default: Optional[S] = None
@@ -83,15 +83,17 @@ class DataType(ABC, Generic[S, RS]):
         self.error_message: Optional[str] = None
         self.units: Optional[str] = None
 
-    @abstractmethod
-    def __contains__(self, val: S) -> bool:
+    def __contains__(self: "DataType", val: Union[ScalarValue, InstanceRoute]) -> bool:
         """Return ``True`` if the receiver type contains `val`.
 
         If the result is ``False``, set also `error_tag` and `error_message`
         properties.
         """
+        # FIXME: Note that type annotation for val is not correct, one of possibilities is InstanceRoute
+        # which is basicaly a list[Union[MemberName, EntryKeys]]
+        return True
 
-    def __str__(self):
+    def __str__(self: "DataType") -> str:
         """Return YANG name of the receiver type."""
         base = self.yang_type()
         return f"{self.name}({base})" if self.name else base
@@ -167,8 +169,7 @@ class DataType(ABC, Generic[S, RS]):
         """Return YANG name of the receiver."""
         return self.__class__.__name__[:-4].lower()
 
-    def _set_error_info(self, error_tag: Optional[str] = None,
-                        error_message: Optional[str] = None):
+    def _set_error_info(self: "DataType", error_tag: Optional[str] = None, error_message: Optional[str] = None) -> None:
         self.error_tag = error_tag if error_tag else "invalid-type"
         self.error_message = (error_message if error_message else
                               "expected " + str(self))
@@ -423,7 +424,7 @@ class BooleanType(DataType[bool, bool]):
 class LinearType(DataType[L, str]):
     """Abstract class representing character or byte sequences."""
 
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "LinearType", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
         self.length: Optional[Intervals[int]] = None
@@ -455,7 +456,7 @@ class LinearType(DataType[L, str]):
 class StringType(LinearType[str]):
     """Class representing YANG "string" type."""
 
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "StringType", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
         self.patterns: list[Pattern] = []
@@ -546,7 +547,7 @@ class BinaryType(LinearType[bytes]):
 class EnumerationType(DataType[str, str]):
     """Class representing YANG "enumeration" type."""
 
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "EnumerationType", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
         self.enum: dict[str, int] = {}
@@ -611,7 +612,7 @@ class EnumerationType(DataType[str, str]):
 class LinkType(DataType[S, RS]):
     """Abstract class for instance-referencing types."""
 
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "LinkType", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
         self.require_instance: bool = True
@@ -625,14 +626,19 @@ class LinkType(DataType[S, RS]):
 class LeafrefType(LinkType[ScalarValue, RawScalar]):
     """Class representing YANG "leafref" type."""
 
-    path: Expr
-    ref_type: DataType
-
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "LeafrefType", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
 
-    def __contains__(self, val: ScalarValue) -> bool:
+    def _handle_properties(self: "LeafrefType", stmt: Statement, sctx: SchemaContext) -> None:
+        super()._handle_properties(stmt, sctx)
+        self.path = XPathParser(
+            stmt.find1("path", required=True).argument, sctx).parse()
+
+    def canonical_string(self: "LeafrefType", val: ScalarValue) -> Optional[str]:
+        return self.ref_type.canonical_string(val)
+
+    def __contains__(self: "LeafrefType", val: Union[ScalarValue, InstanceRoute]) -> bool:
         return val in self.ref_type
 
     def _handle_properties(self, stmt: Statement, sctx: SchemaContext) -> None:
@@ -682,13 +688,20 @@ class LeafrefType(LinkType[ScalarValue, RawScalar]):
 class InstanceIdentifierType(LinkType[InstanceRoute, InstanceIdentifier]):
     """Class representing YANG "instance-identifier" type."""
 
-    def __str__(self):
+    def __init__(self: "InstanceIdentifierType", sctx: SchemaContext, name: Optional[YangIdentifier]) -> None:
+        super().__init__(sctx, name)
+        self.root = None # type: SchemaNode
+        """XPath document root schema node."""
+
+    def __str__(self: "InstanceIdentifierType") -> str:
         return "instance-identifier"
 
-    def __contains__(self, val: InstanceRoute) -> bool:
-        return isinstance(val, InstanceRoute)
+    def __contains__(self: "InstanceIdentifierType", val: InstanceRoute) -> bool:
+        # TODO: route = cast(InstanceRoute, val) [related to FIXME above]
+        node = self.root.get_schema_descendant(val.as_schema_route())
+        return node is not None
 
-    def yang_type(self) -> YangIdentifier:
+    def yang_type(self: "InstanceIdentifierType") -> YangIdentifier:
         """Override the superclass method."""
         return "instance-identifier"
 
@@ -720,11 +733,17 @@ class InstanceIdentifierType(LinkType[InstanceRoute, InstanceIdentifier]):
     def _deref(node: InstanceNode) -> list[InstanceNode]:
         return [node.top().goto(cast(InstanceRoute, node.value))]
 
+    def _post_process(self: "InstanceIdentifierType", tnode: "TerminalNode") -> None:
+        if tnode._y_data_struct:
+            self.root = tnode._y_data_struct
+        else:
+            self.root = tnode.schema_root()
+
 
 class IdentityrefType(DataType[QualName, YangIdentifier]):
     """Class representing YANG "identityref" type."""
 
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "IdentityrefType", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
         self.bases: list[QualName] = []
@@ -810,7 +829,7 @@ class IdentityrefType(DataType[QualName, YangIdentifier]):
 class NumericType(DataType[N, RN]):
     """Abstract class for numeric data types."""
 
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "NumericType", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
         self.range: Optional[Intervals[N]] = None
@@ -854,7 +873,7 @@ class NumericType(DataType[N, RN]):
 class Decimal64Type(NumericType[decimal.Decimal, str]):
     """Class representing YANG "decimal64" type."""
 
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "Decimal64Type", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
         self._epsilon = decimal.Decimal(0)
@@ -1092,12 +1111,49 @@ class Uint64Type(IntegralType[str]):
 class UnionType(DataType[ScalarValue, RawScalar]):
     """Class representing YANG "union" type."""
 
-    def __init__(self, sctx: SchemaContext, name: YangIdentifier) -> None:
+    def __init__(self: "UnionType", sctx: SchemaContext, name: YangIdentifier) -> None:
         """Initialize the class instance."""
         super().__init__(sctx, name)
         self.types: list[DataType] = []
 
-    def __contains__(self, val: ScalarValue) -> bool:
+    def to_raw(self: "UnionType", val: ScalarValue) -> RawScalar:
+        for t in self.types:
+            if val in t:
+                return t.to_raw(val)
+
+    def to_xml(self: "UnionType", val: ScalarValue) -> RawScalar:
+        for t in self.types:
+            if val in t:
+                return t.to_xml(val)
+
+    def canonical_string(self: "UnionType", val: ScalarValue) -> Optional[str]:
+        for t in self.types:
+            if val in t:
+                return t.canonical_string(val)
+        return None
+
+    def parse_value(self: "UnionType", text: str) -> Optional[ScalarValue]:
+        for t in self.types:
+            val = t.parse_value(text)
+            if val is not None and val in t:
+                return val
+        return None
+
+    def from_raw(self: "UnionType", raw: RawScalar) -> Optional[ScalarValue]:
+        for t in self.types:
+            val = t.from_raw(raw)
+            if val is not None and val in t:
+                return val
+        return None
+
+    def from_xml(self: "UnionType", xml: ET.Element) -> Optional[ScalarValue]:
+        for t in self.types:
+            val = t.from_xml(xml)
+            if val is not None and val in t:
+                return val
+        return None
+
+    def __contains__(self: "UnionType", val: Union[ScalarValue, InstanceRoute]) -> bool:
         for t in self.types:
             try:
                 if val in t:
