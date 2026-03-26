@@ -33,7 +33,7 @@ from .instance import InstanceIdParser, ResourceIdParser, RootNode
 from .instroute import InstanceRoute
 from .instvalue import ObjectValue
 from .schemadata import SchemaData, SchemaContext
-from .schemanode import DataNode, SchemaTreeNode, RawObject, SchemaNode, YangData
+from .schemanode import DataNode, SchemaTreeFactory, RawObject, SchemaNode, YangData
 from .typealiases import DataPath, PrefName, SchemaPath
 
 
@@ -61,13 +61,15 @@ class DataModel:
         return cls(yltxt, mod_path, description)
 
     def __init__(self: "DataModel", yltxt: str, mod_path: tuple[str] = (".",),
-                 description: Optional[str] = None) -> None:
+                 description: Optional[str] = None,
+                 tree_factory: Optional[SchemaTreeFactory] = None) -> None:
         """Initialize the class instance.
 
         Args:
             yltxt: JSON text with YANG library data.
             mod_path: Tuple of directories where to look for YANG modules.
             description: Optional description of the data model.
+            tree_factory: Factory for getting SchemaTreeNode instance.
 
         Raises:
             BadYangLibraryData: If YANG library data is invalid.
@@ -83,7 +85,9 @@ class DataModel:
         except json.JSONDecodeError as e:
             raise BadYangLibraryData(str(e)) from None
         self.schema_data = SchemaData(self.yang_library, mod_path)
-        self.schema = SchemaTreeNode(self.schema_data)
+        if tree_factory is None:
+            tree_factory = SchemaTreeFactory()
+        self.schema = tree_factory.create_tree(self.schema_data)
         self.schema._ctype = ContentType.all
         self._build_schema()
         self._build_imported_idents()

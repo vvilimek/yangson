@@ -2178,3 +2178,21 @@ class NotificationNode(SchemaTreeNode):
 
     def _tree_line_prefix(self: "NotificationNode", ctype: bool) -> str:
         return super()._tree_line_prefix(ctype) + "-n"
+
+
+class SchemaTreeFactory:
+    """Factory interface as well as default implementation of tree factory."""
+
+    def create_tree(schemadata: SchemaData) -> SchemaTreeNode:
+        """Create schema tree from schema data.
+
+        Args:
+            schemadata: Holds repository of YANG modules for which the data model schema tree should be built.
+
+        Returns:
+            Created schema tree node.
+
+        Raises:
+            TODO
+        """
+        return SchemaTreeNode(schdata)
