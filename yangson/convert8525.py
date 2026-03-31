@@ -1,4 +1,4 @@
-# Copyright © 2016-2026 CZ.NIC, z. s. p. o.
+ Copyright © 2016-2026 CZ.NIC, z. s. p. o.
 #
 # This file is part of Yangson.
 #
@@ -99,7 +99,7 @@ YL8525 = """
 
 class ModuleData:
 
-    def __init__(self: "ModuleData", rfc8525_entry: ArrayEntry) -> None:
+    def __init__(self, rfc8525_entry: ArrayEntry) -> None:
         """Initialize the receiver."""
         self.name: str = val["name"]
         self.revision: str = val.get("revision", "")

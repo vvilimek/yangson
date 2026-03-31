@@ -62,7 +62,7 @@ class DataModel:
             yltxt = infile.read()
         return cls(yltxt, mod_path, description, tree_factory=tree_factory)
 
-    def __init__(self: "DataModel", yltxt: str, mod_path: tuple[str] = (".",),
+    def __init__(self, yltxt: str, mod_path: tuple[str] = (".",),
                  description: Optional[str] = None,
                  tree_factory: Optional[SchemaTreeFactory] = None) -> None:
         """Initialize the class instance.
@@ -108,7 +108,7 @@ class DataModel:
         fnames = sorted(["@".join(m) for m in self.schema_data.modules])
         return hashlib.sha1("".join(fnames).encode("ascii")).hexdigest()
 
-    def from_raw(self: "DataModel", robj: RawObject,
+    def from_raw(self, robj: RawObject,
                  subschema: Optional[PrefName] = None) -> RootNode:
         """Create an instance node from a raw data tree.
 
@@ -136,7 +136,7 @@ class DataModel:
         cooked = cast(ObjectValue, schema.from_raw(robj))
         return RootNode(cooked, schema, self.schema_data, cooked.timestamp)
 
-    def from_xml(self: "DataModel", root: ET.Element,
+    def from_xml(self, root: ET.Element,
                  subschema: Optional[PrefName] = None) -> RootNode:
         """Create an instance node from a raw data tree.
 
@@ -212,7 +212,7 @@ class DataModel:
         """
         return self.schema._ascii_tree("", no_types, val_count)
 
-    def clear_val_counters(self: "DataModel") -> None:
+    def clear_val_counters(self) -> None:
         """Clear validation counters in the entire schema tree."""
         self.schema.clear_val_counters()
 
@@ -252,7 +252,7 @@ class DataModel:
                 self.schema._deviation_stmt(dev, sctx)
         self.schema._post_process()
 
-    def _build_imported_idents(self: "DataModel") -> None:
+    def _build_imported_idents(self) -> None:
         for mid in self.schema_data._import_module_sequence:
             if mid in self.schema_data._module_sequence:
                 continue
@@ -262,7 +262,7 @@ class DataModel:
                     self.schema_data, self.schema_data.namespace(mid), mid)
                 self.schema._identity_stmt(ident, sctx)
 
-    def _restrict_yang_data_idents(self: "DataModel") -> None:
+    def _restrict_yang_data_idents(self) -> None:
         for c in self.schema.children:
             if isinstance(c, YangData):
                 mod_seq = []

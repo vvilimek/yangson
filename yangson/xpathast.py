@@ -120,7 +120,7 @@ class Expr:
         """Convert receiver to an InstanceRoute."""
         raise NotImplementedError
 
-    def as_schema_route(self: "Expr", node: "SchemaNode") -> Optional[SchemaRoute]:
+    def as_schema_route(self, node: "SchemaNode") -> Optional[SchemaRoute]:
         """Convert receiver to a SchemaRoute.
 
         Args:
@@ -131,7 +131,7 @@ class Expr:
         """
         raise NotImplementedError
 
-    def _properties_str(self: "Expr") -> str:
+    def _properties_str(self) -> str:
         return ""
 
     def _children_ast(self, indent) -> str:
@@ -164,7 +164,7 @@ class Expr:
             ns = res
         return ns
 
-    def check(self: "Expr", ctx_root: "SchemaNode") -> bool:
+    def check(self, ctx_root: "SchemaNode") -> bool:
         """Test if the XPath expression does not reference nodes outside given context.
         This function is useful when checking ietf-restconf:yang-data XPath exprs.
 
@@ -194,7 +194,7 @@ class UnaryExpr(Expr):
     def _children_ast(self, indent: int) -> str:
         return self.expr.syntax_tree(indent) if self.expr else ""
 
-    def check(self: "Expr", ctx_root: "SchemaNode") -> bool:
+    def check(self, ctx_root: "SchemaNode") -> bool:
         return self.expr.check(ctx_root)
 
 
@@ -234,7 +234,7 @@ class BinaryExpr(Expr):
         sop = f" {op} " if spaces else op
         return f"{lft}{sop}{rt}"
 
-    def check(self: Expr, ctx_root: "SchemaNode") -> bool:
+    def check(self, ctx_root: "SchemaNode") -> bool:
         return self.left.check(ctx_root) and self.right.check(ctx_root)
 
 
@@ -271,7 +271,7 @@ class EqualityExpr(BinaryExpr):
     def __str__(self) -> str:
         return self._as_str("!=" if self.negate else "=")
 
-    def as_instance_route(self: "EqualityExpr") -> InstanceRoute:
+    def as_instance_route(self) -> InstanceRoute:
         step = self.left
         # TODO: fix return
 
@@ -474,7 +474,7 @@ class LocationPath(BinaryExpr):
         return InstanceRoute(self.left.as_instance_route() +
                              self.right.as_instance_route())
 
-    def as_schema_route(self: "Expr", node: Optional["SchemaNode"] = None) -> Optional[SchemaRoute]:
+    def as_schema_route(self, node: Optional["SchemaNode"] = None) -> Optional[SchemaRoute]:
         """Get a SchemaRoute from XPath expression receiver.
 
         Args:
@@ -487,12 +487,12 @@ class LocationPath(BinaryExpr):
         if node:
             return node.as_schema_route()
 
-    def _location_node(self: "Expr", node: "SchemaNode") -> Optional["SchemaNode"]:
+    def _location_node(self, node: "SchemaNode") -> Optional["SchemaNode"]:
         """Find relative XPath expression base node."""
         ln = self.left._location_node(node)
         return self.right._location_node(ln) if ln is not None else None
 
-    def check(self: Expr, node: "SchemaNode") -> bool:
+    def check(self, node: "SchemaNode") -> bool:
         return self.as_schema_route(node) is not None
 
 class Root(Expr):
@@ -508,7 +508,7 @@ class Root(Expr):
     def as_instance_route(self) -> InstanceRoute:
         return InstanceRoute([])
 
-    def as_schema_route(self: "Expr", node: "SchemaNode") -> Optional[SchemaRoute]:
+    def as_schema_route(self, node: "SchemaNode") -> Optional[SchemaRoute]:
         """Get a SchemaRoute from XPath expression receiver.
 
         Args:
@@ -519,7 +519,7 @@ class Root(Expr):
             or path with nonexistent child."""
         return []
 
-    def _location_node(self: "Expr", node: "SchemaNode") -> "SchemaNode":
+    def _location_node(self, node: "SchemaNode") -> "SchemaNode":
         """Find relative XPath expression base node."""
         if node._y_data_struct is not None:
             return node._y_data_struct
@@ -527,7 +527,7 @@ class Root(Expr):
             return node.schema_root()
 
 class Step(Expr):
-    def __init__(self: "Step", axis: Axis, qname: QualName,
+    def __init__(self, axis: Axis, qname: QualName,
                  predicates: list[Expr]):
         self.axis = axis
         self.qname = qname
@@ -564,7 +564,7 @@ class Step(Expr):
             espec = EntryKeys(ks)
         return InstanceRoute([m, espec])
 
-    def as_schema_route(self: "Expr", node: "SchemaNode") -> Optional[SchemaRoute]:
+    def as_schema_route(self, node: "SchemaNode") -> Optional[SchemaRoute]:
         """Get a SchemaRoute from XPath expression receiver.
 
         Args:
@@ -577,7 +577,7 @@ class Step(Expr):
         if node:
             return node.as_schema_route()
 
-    def _location_node(self: "Expr", node: "SchemaNode") -> Optional["SchemaNode"]:
+    def _location_node(self, node: "SchemaNode") -> Optional["SchemaNode"]:
         """Find relative XPath expression base node."""
         if self.qname is not None and self.axis == Axis.child:
             # if not isinstance(node, InternalNode):
@@ -595,7 +595,7 @@ class Step(Expr):
         else:
             assert False
 
-    def _properties_str(self: "Step") -> str:
+    def _properties_str(self) -> str:
         return f"{self.axis.name} {self.qname}"
 
     def _children_ast(self, indent) -> str:
