@@ -4,6 +4,14 @@
 ![Commits](https://img.shields.io/github/commit-activity/y/CZ-NIC/yangson?label=commits)
 [![PyPI downloads](https://img.shields.io/pypi/dm/yangson?label=PyPI%20downloads)](https://pypi.org/project/yangson)
 
+# Repository Information
+
+This repo is a fork of [CZ-NIC/yangson](https://github.com/CZ-NIC/yangson). The main goal is to add support
+for RFC 8525 and allow implementation of RFC 9595 YANG SID. The code dealing with YANG SID can be found
+in [yang-sid](https://github.com/vvilimek/yang-sid) repository.
+
+The support is RFC 8525 is not yet implemented but is planned in the future. This RFC is successor of RFC 7895 Yang Library.
+
 # Welcome to Yangson
 
 *Yangson* is a Python 3 library for working with configuration and
