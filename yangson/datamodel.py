@@ -42,13 +42,15 @@ class DataModel:
 
     @classmethod
     def from_file(cls, name: str, mod_path: tuple[str] = (".",),
-                  description: Optional[str] = None) -> "DataModel":
+                  description: Optional[str] = None,
+                  tree_factory: Optional[SchemaTreeFactory] = None) -> "DataModel":
         """Initialize the data model from a file with YANG library data.
 
         Args:
             name: Name of a file with YANG library data.
             mod_path: Tuple of directories where to look for YANG modules.
             description:  Optional description of the data model.
+            tree_factory: Factory for getting SchekmaTreeNode instance.
 
         Returns:
             The data model instance.
@@ -58,7 +60,7 @@ class DataModel:
         """
         with open(name, encoding="utf-8") as infile:
             yltxt = infile.read()
-        return cls(yltxt, mod_path, description)
+        return cls(yltxt, mod_path, description, tree_factory=tree_factory)
 
     def __init__(self: "DataModel", yltxt: str, mod_path: tuple[str] = (".",),
                  description: Optional[str] = None,
