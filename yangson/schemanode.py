@@ -978,7 +978,7 @@ class YangData(GroupNode):
     # TODO from_raw, from_xml
     # TODO ascii tree printing
 
-    def __init__(self:, sctx: Optional[SchemaContext] = None) -> None:
+    def __init__(self, sctx: Optional[SchemaContext] = None) -> None:
         super().__init__()
         self._ctype = ContentType.all
         self.context = sctx
@@ -1206,7 +1206,7 @@ class DataNode(SchemaNode):
         super().__init__()
         self.default_deny: DefaultDeny = DefaultDeny.none
 
-    def orphan_instance(self, rval: RawValue) -> "ObjectMember":
+    def orphan_instance(self, rval: RawValue) -> ObjectMember:
         """Return an isolated instance of the receiver.
 
         Args:
@@ -2193,7 +2193,7 @@ class NotificationNode(SchemaTreeNode):
 class SchemaTreeFactory:
     """Factory interface as well as default implementation of tree factory."""
 
-    def create_tree(schemadata: SchemaData) -> SchemaTreeNode:
+    def create_tree(self, schemadata: SchemaData) -> SchemaTreeNode:
         """Create schema tree from schema data.
 
         Args:
@@ -2205,4 +2205,4 @@ class SchemaTreeFactory:
         Raises:
             TODO
         """
-        return SchemaTreeNode(schdata)
+        return SchemaTreeNode(schemadata)

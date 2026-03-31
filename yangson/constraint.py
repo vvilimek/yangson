@@ -25,7 +25,8 @@ This module implements the following classes:
 * Must: Class representing the constraint specified by a "must" statement.
 """
 import re
-from typing import Callable, Generic, Optional
+import decimal
+from typing import Callable, Generic, Optional, Union
 from elementpath import RegexError, translate_pattern
 
 from .exceptions import InvalidArgument
