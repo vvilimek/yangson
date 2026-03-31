@@ -33,7 +33,7 @@ from .instance import InstanceIdParser, ResourceIdParser, RootNode
 from .instroute import InstanceRoute
 from .instvalue import ObjectValue
 from .schemadata import SchemaData, SchemaContext
-from .schemanode import DataNode, SchemaTreeFactory, RawObject, SchemaNode, YangData
+from .schemanode import DataNode, SchemaTreeNode, InternalNode, SchemaTreeFactory, RawObject, SchemaNode, YangData
 from .typealiases import DataPath, PrefName, SchemaPath
 
 

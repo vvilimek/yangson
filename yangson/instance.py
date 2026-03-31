@@ -49,7 +49,7 @@ from .instvalue import (ArrayValue, InstanceKey, ObjectValue, Value,
                         ScalarValue, StructuredValue)
 from .parser import Parser
 from .typealiases import (InstanceName, JSONPointer, QualName, RawScalar,
-                          RawValue, SchemaRoute, YangIdentifier)
+                          RawValue, SchemaRoute, YangIdentifier, _Singleton)
 if TYPE_CHECKING:
     from .schemadata import SchemaData
 

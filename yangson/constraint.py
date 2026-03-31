@@ -25,7 +25,8 @@ This module implements the following classes:
 * Must: Class representing the constraint specified by a "must" statement.
 """
 import re
-from typing import Callable, Generic, Optional
+import decimal
+from typing import Callable, Generic, Optional, Union
 from elementpath import RegexError, translate_pattern
 from typing import TYPE_CHECKING
 
@@ -173,4 +174,4 @@ class Must(Constraint):
             ``True`` if the references don't use nodes outside given context.
         """
 
-       return self.expression.check(ctx_root)
+        return self.expression.check(ctx_root)

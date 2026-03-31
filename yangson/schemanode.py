@@ -44,7 +44,7 @@ from collections import deque
 from collections.abc import MutableSet
 from datetime import datetime
 from itertools import product
-from typing import Any, Optional, TYPE_CHECKING, NoReturn
+from typing import Any, Optional, TYPE_CHECKING, NoReturn, cast
 import xml.etree.ElementTree as ET
 import copy
 from .constraint import Must
@@ -57,6 +57,8 @@ from .exceptions import (
     MissingAnnotationTarget, MissingModuleNamespace, RawMemberError,
     RawTypeError, SchemaError, SemanticError, UndefinedAnnotation,
     InvalidStatement, YangsonException, YangTypeError, InvalidArgument)
+from .instance import InstanceNode, ArrayEntry
+from .instroute import InstanceRoute
 from .instvalue import (
     ArrayValue, EntryValue, MetadataObject, ObjectValue, Value)
 from .schemadata import IdentityAdjacency, SchemaContext, SchemaData
@@ -968,7 +970,7 @@ class YangData(GroupNode):
     # TODO from_raw, from_xml
     # TODO ascii tree printing
 
-    def __init__(self:, sctx: Optional[SchemaContext] = None) -> None:
+    def __init__(self, sctx: Optional[SchemaContext] = None) -> None:
         super().__init__()
         self._ctype = ContentType.all
         self.context = sctx
@@ -2183,7 +2185,7 @@ class NotificationNode(SchemaTreeNode):
 class SchemaTreeFactory:
     """Factory interface as well as default implementation of tree factory."""
 
-    def create_tree(schemadata: SchemaData) -> SchemaTreeNode:
+    def create_tree(self, schemadata: SchemaData) -> SchemaTreeNode:
         """Create schema tree from schema data.
 
         Args:
@@ -2195,4 +2197,4 @@ class SchemaTreeFactory:
         Raises:
             TODO
         """
-        return SchemaTreeNode(schdata)
+        return SchemaTreeNode(schemadata)

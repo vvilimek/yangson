@@ -50,7 +50,7 @@ import decimal
 import xml.etree.ElementTree as ET
 import re
 from typing import (Any, cast, ClassVar, Generic, Optional, Type,
-                    TYPE_CHECKING)
+                    Union, TYPE_CHECKING)
 
 from .constraint import Intervals, Pattern
 from .exceptions import (
