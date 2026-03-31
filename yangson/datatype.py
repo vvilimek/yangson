@@ -92,7 +92,7 @@ class DataType(ABC, Generic[S, RS]):
         """
         ...
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return YANG name of the receiver type."""
         base = self.yang_type()
         return f"{self.name}({base})" if self.name else base
@@ -169,7 +169,7 @@ class DataType(ABC, Generic[S, RS]):
         return self.__class__.__name__[:-4].lower()
 
     def _set_error_info(self, error_tag: Optional[str] = None,
-                        error_message: Optional[str] = None):
+                        error_message: Optional[str] = None) -> None:
         self.error_tag = error_tag if error_tag else "invalid-type"
         self.error_message = (error_message if error_message else
                               "expected " + str(self))
@@ -633,12 +633,12 @@ class LeafrefType(LinkType[ScalarValue, RawScalar]):
         """Initialize the class instance."""
         super().__init__(sctx, name)
 
-    def _handle_properties(self: "LeafrefType", stmt: Statement, sctx: SchemaContext) -> None:
+    def _handle_properties(self, stmt: Statement, sctx: SchemaContext) -> None:
         super()._handle_properties(stmt, sctx)
         self.path = XPathParser(
             stmt.find1("path", required=True).argument, sctx).parse()
 
-    def canonical_string(self: "LeafrefType", val: ScalarValue) -> Optional[str]:
+    def canonical_string(self, val: ScalarValue) -> Optional[str]:
         return self.ref_type.canonical_string(val)
 
     def __contains__(self, val: Union[ScalarValue, InstanceRoute]) -> bool:
@@ -691,20 +691,20 @@ class LeafrefType(LinkType[ScalarValue, RawScalar]):
 class InstanceIdentifierType(LinkType[InstanceRoute, InstanceIdentifier]):
     """Class representing YANG "instance-identifier" type."""
 
-    def __init__(self: "InstanceIdentifierType", sctx: SchemaContext, name: Optional[YangIdentifier]) -> None:
+    def __init__(self, sctx: SchemaContext, name: Optional[YangIdentifier]) -> None:
         super().__init__(sctx, name)
         self.root: Optional[SchemaNode] = None
         """XPath document root schema node."""
 
-    def __str__(self: "InstanceIdentifierType") -> str:
+    def __str__(self) -> str:
         return "instance-identifier"
 
-    def __contains__(self: "InstanceIdentifierType", val: InstanceRoute) -> bool:
+    def __contains__(self, val: InstanceRoute) -> bool:
         # TODO: route = cast(InstanceRoute, val) [related to FIXME above]
         node = self.root.get_schema_descendant(val.as_schema_route())
         return node is not None
 
-    def yang_type(self: "InstanceIdentifierType") -> YangIdentifier:
+    def yang_type(self) -> YangIdentifier:
         """Override the superclass method."""
         return "instance-identifier"
 
@@ -736,7 +736,7 @@ class InstanceIdentifierType(LinkType[InstanceRoute, InstanceIdentifier]):
     def _deref(node: InstanceNode) -> list[InstanceNode]:
         return [node.top().goto(cast(InstanceRoute, node.value))]
 
-    def _post_process(self: "InstanceIdentifierType", tnode: "TerminalNode") -> None:
+    def _post_process(self, tnode: "TerminalNode") -> None:
         if tnode._y_data_struct:
             self.root = tnode._y_data_struct
         else:
@@ -1119,37 +1119,37 @@ class UnionType(DataType[ScalarValue, RawScalar]):
         super().__init__(sctx, name)
         self.types: list[DataType] = []
 
-    def to_raw(self: "UnionType", val: ScalarValue) -> RawScalar:
+    def to_raw(self, val: ScalarValue) -> RawScalar:
         for t in self.types:
             if val in t:
                 return t.to_raw(val)
 
-    def to_xml(self: "UnionType", val: ScalarValue) -> RawScalar:
+    def to_xml(self, val: ScalarValue) -> RawScalar:
         for t in self.types:
             if val in t:
                 return t.to_xml(val)
 
-    def canonical_string(self: "UnionType", val: ScalarValue) -> Optional[str]:
+    def canonical_string(self, val: ScalarValue) -> Optional[str]:
         for t in self.types:
             if val in t:
                 return t.canonical_string(val)
         return None
 
-    def parse_value(self: "UnionType", text: str) -> Optional[ScalarValue]:
+    def parse_value(self, text: str) -> Optional[ScalarValue]:
         for t in self.types:
             val = t.parse_value(text)
             if val is not None and val in t:
                 return val
         return None
 
-    def from_raw(self: "UnionType", raw: RawScalar) -> Optional[ScalarValue]:
+    def from_raw(self, raw: RawScalar) -> Optional[ScalarValue]:
         for t in self.types:
             val = t.from_raw(raw)
             if val is not None and val in t:
                 return val
         return None
 
-    def from_xml(self: "UnionType", xml: ET.Element) -> Optional[ScalarValue]:
+    def from_xml(self, xml: ET.Element) -> Optional[ScalarValue]:
         for t in self.types:
             val = t.from_xml(xml)
             if val is not None and val in t:

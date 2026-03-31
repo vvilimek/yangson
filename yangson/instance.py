@@ -19,7 +19,6 @@
 
 This module implements the following classes:
 
-* LinkedList: Persistent linked list of instance values.
 * InstanceNode: Abstract class for instance nodes.
 * RootNode: Root of the data tree.
 * ObjectMember: Instance node that is an object member.
@@ -825,14 +824,14 @@ class ObjectMember(InstanceNode):
 
     def _ancestors_or_self(
             self,
-            qname: Union[QualName, bool] = None) -> list[InstanceNode]:
+            qname: Union[QualName, bool, None] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's ancestors including itself."""
         res = [] if qname and self.qual_name != qname else [self]
         return res + self.up()._ancestors_or_self(qname)
 
     def _ancestors(
             self,
-            qname: Union[QualName, bool] = None) -> list[InstanceNode]:
+            qname: Union[QualName, bool, None] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's ancestors."""
         return self.up()._ancestors_or_self(qname)
 
@@ -983,20 +982,20 @@ class ArrayEntry(InstanceNode):
 
     def _ancestors_or_self(
             self,
-            qname: Union[QualName, bool] = None) -> list[InstanceNode]:
+            qname: Union[QualName, bool, None] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's ancestors including itself."""
         res = [] if qname and self.qual_name != qname else [self]
         return res + self.up()._ancestors(qname)
 
     def _ancestors(
             self,
-            qname: Union[QualName, bool] = None) -> list[InstanceNode]:
+            qname: Union[QualName, bool, None] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's ancestors."""
         return self.up()._ancestors(qname)
 
     def _preceding_siblings(
             self,
-            qname: Union[QualName, bool] = None) -> list[InstanceNode]:
+            qname: Union[QualName, bool, None] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's preceding siblings."""
         if qname and self.qual_name != qname:
             return []
@@ -1009,7 +1008,7 @@ class ArrayEntry(InstanceNode):
 
     def _following_siblings(
             self,
-            qname: Union[QualName, bool] = None) -> list[InstanceNode]:
+            qname: Union[QualName, bool, None] = None) -> list[InstanceNode]:
         """XPath - return the list of receiver's following siblings."""
         if qname and self.qual_name != qname:
             return []
@@ -1063,6 +1062,9 @@ class MemberName:
     def goto_step(self, inst: InstanceNode) -> InstanceNode:
         return inst[self.iname()]
 
+    def as_qual_name(self) -> QualName:
+        """Get a QualName from MemberName."""
+        return (self.name, self.namespace)
 
 class ActionName(MemberName):
     """Name of an action (can appear in RESTCONF resource IDs).

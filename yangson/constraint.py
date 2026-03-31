@@ -63,7 +63,7 @@ class Intervals(Constraint, Generic[N]):
         self.intervals = intervals
         self.parser = parser if parser else Intervals.default_parser
 
-    def __contains__(self, value: N):
+    def __contains__(self, value: N) -> bool:
         """Return ``True`` if the receiver contains the value."""
         for r in self.intervals:
             if len(r) == 1:
@@ -153,7 +153,7 @@ class Must(Constraint):
             error_tag if error_tag else "must-violation", error_message)
         self.expression = expression
 
-    def check(self: "Must", ctx_root: "SchemaNode") -> bool:
+    def check(self, ctx_root: "SchemaNode") -> bool:
         """Test if must constraint does not reference nodes outside given context.
         This function is useful when checking ietf-restconf:yang-data constraints.
 

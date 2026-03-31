@@ -89,7 +89,7 @@ RawValue = Union[RawScalar, RawObject, RawList, RawLeafList]
 """Raw value of any type."""
 
 # Type variables for use in generic classes
-S = TypeVar("S", bound=ScalarValue)
+S = TypeVar("S", bound=ScalarValue) # TODO S might also be InstanceRoute
 RS = TypeVar("RS", bound=RawScalar)
 L = TypeVar("L", str, bytes)
 N = TypeVar("N", int, Decimal)

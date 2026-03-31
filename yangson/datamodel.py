@@ -213,7 +213,7 @@ class DataModel:
         """
         return self.schema._ascii_tree("", no_types, val_count)
 
-    def clear_val_counters(self):
+    def clear_val_counters(self) -> None:
         """Clear validation counters in the entire schema tree."""
         self.schema.clear_val_counters()
 
@@ -253,7 +253,7 @@ class DataModel:
                 self.schema._deviation_stmt(dev, sctx)
         self.schema._post_process()
 
-    def _build_imported_idents(self: "DataModel") -> None:
+    def _build_imported_idents(self) -> None:
         for mid in self.schema_data._import_module_sequence:
             if mid in self.schema_data._module_sequence:
                 continue
@@ -263,7 +263,7 @@ class DataModel:
                     self.schema_data, self.schema_data.namespace(mid), mid)
                 self.schema._identity_stmt(ident, sctx)
 
-    def _restrict_yang_data_idents(self: "DataModel") -> None:
+    def _restrict_yang_data_idents(self) -> None:
         for c in self.schema.children:
             if isinstance(c, YangData):
                 mod_seq = []
