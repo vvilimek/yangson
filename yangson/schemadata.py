@@ -96,6 +96,8 @@ class SchemaData:
             mod_path: List of directories to search for YANG modules.
     """
 
+    module_data_factory: ClassVar[type] = ModuleDataFactory
+
     def __init__(self, yang_lib: dict[str, Any],
                  mod_path: Sequence[str]) -> None:
         """Initialize the schema structures."""
@@ -130,12 +132,15 @@ class SchemaData:
             ModuleNotFound: If a YANG module wasn't found in any of the
                 directories specified in `mod_path`.
         """
+
+        module_factory: ModuleDataFactory = self.module_data_factory()
+
         try:
             for item in yang_lib["ietf-yang-library:modules-state"]["module"]:
                 name = item["name"]
                 rev = item["revision"]
                 mid = (name, rev)
-                mdata = ModuleData(mid, mid)
+                mdata = module_factory.create_module_data(mid, mid)
                 mdata.xml_namespace = item.get('namespace')
                 self.modules[mid] = mdata
                 self.modules_by_name[name] = mdata
@@ -157,7 +162,7 @@ class SchemaData:
                         sname = s["name"]
                         srev = s["revision"]
                         smid = (sname, srev)
-                        sdata = ModuleData(mid, smid)
+                        sdata = module_factory.create_module_data(mid, smid)
                         sdata.xml_namespace = s.get('namespace')
                         self.modules[smid] = sdata
                         self.modules_by_name[sname] = sdata
@@ -517,6 +522,10 @@ class SchemaData:
             if not FeatureExprParser(i.argument, self, mid).parse():
                 return False
         return True
+
+class ModuleDataFactory:
+    def create_module_data(self, main_module: YangIdentifier, yang_id: YangIdentifier) -> ModuleData:
+        return ModuleData(main_module, yang_id)
 
 class SchemaDataFactory:
     """Factory interface as well as default implementation of schema data factory."""
