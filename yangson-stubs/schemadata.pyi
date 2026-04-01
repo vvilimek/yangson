@@ -4,7 +4,7 @@ from .parser import Parser
 from .statement import ModuleParser, Statement
 from .typealiases import ModuleId, PrefName, QualName, RevisionDate, SchemaNodeId, SchemaPath, SchemaRoute, YangIdentifier
 from collections.abc import MutableSet
-from typing import Any
+from typing import Any, ClassVar
 
 class IdentityAdjacency:
     bases: MutableSet[QualName]
@@ -35,6 +35,7 @@ class SchemaData:
     modules: dict[ModuleId, ModuleData]
     modules_by_name: dict[str, ModuleData]
     modules_by_ns: dict[str, ModuleData]
+    module_data_factory: ClassVar[type]
     def __init__(self, yang_lib: dict[str, Any], mod_path: list[str]) -> None: ...
     def namespace(self, mid: ModuleId) -> YangIdentifier: ...
     def last_revision(self, mod: YangIdentifier) -> ModuleId: ...
@@ -51,6 +52,12 @@ class SchemaData:
     def derived_from(self, identity: QualName) -> MutableSet[QualName]: ...
     def derived_from_all(self, identities: list[QualName]) -> MutableSet[QualName]: ...
     def if_features(self, stmt: Statement, mid: ModuleId) -> bool: ...
+
+class ModuleDataFactory:
+    def create_module_data(self, main_module: YangIdentifier, yang_id: YangIdentifier) -> ModuleData: ...
+
+class SchemaDataFactory:
+    def create_schema_data(self, yang_lib: dict[str, Any], mod_path: list[str]) -> SchemaData: ...
 
 class FeatureExprParser(Parser):
     mid: ModuleId
