@@ -518,6 +518,24 @@ class SchemaData:
                 return False
         return True
 
+class SchemaDataFactory:
+    """Factory interface as well as default implementation of schema data factory."""
+
+    def create_schema_data(self, yang_lib: dict[str, Any], mod_path: list[str]) -> SchemaData:
+        """Create schema data from yang library with module search path.
+
+        Args:
+            yang_lib: From JSON parsed RFC 7895 YANG Library.
+            mod_path: List of directories where modules are searched.
+
+        Returns:
+            Created schema data.
+
+        Raises:
+            TODO
+        """
+
+        return SchemaData(yang_lib, mod_path)
 
 class FeatureExprParser(Parser):
     """Parser and evaluator for if-feature expressions."""

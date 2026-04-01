@@ -32,7 +32,7 @@ from .exceptions import (BadYangLibraryData, BadSchemaNodeType,
 from .instance import InstanceIdParser, ResourceIdParser, RootNode
 from .instroute import InstanceRoute
 from .instvalue import ObjectValue
-from .schemadata import SchemaData, SchemaContext
+from .schemadata import SchemaData, SchemaDataFactory, SchemaContext
 from .schemanode import DataNode, SchemaTreeNode, InternalNode, SchemaTreeFactory, RawObject, SchemaNode, YangData
 from .typealiases import DataPath, PrefName, SchemaPath
 
@@ -43,6 +43,7 @@ class DataModel:
     @classmethod
     def from_file(cls, name: str, mod_path: tuple[str] = (".",),
                   description: Optional[str] = None,
+                  data_factory: Optional[SchemaDataFactory] = None,
                   tree_factory: Optional[SchemaTreeFactory] = None) -> "DataModel":
         """Initialize the data model from a file with YANG library data.
 
@@ -50,7 +51,8 @@ class DataModel:
             name: Name of a file with YANG library data.
             mod_path: Tuple of directories where to look for YANG modules.
             description:  Optional description of the data model.
-            tree_factory: Factory for getting SchekmaTreeNode instance.
+            data_factory: Factory for getting SchemaData instance.
+            tree_factory: Factory for getting SchemaTreeNode instance.
 
         Returns:
             The data model instance.
@@ -60,10 +62,11 @@ class DataModel:
         """
         with open(name, encoding="utf-8") as infile:
             yltxt = infile.read()
-        return cls(yltxt, mod_path, description, tree_factory=tree_factory)
+        return cls(yltxt, mod_path, description, data_factory=data_factory, tree_factory=tree_factory)
 
     def __init__(self, yltxt: str, mod_path: tuple[str] = (".",),
                  description: Optional[str] = None,
+                 data_factory: Optional[SchemaDataFactory] = None,
                  tree_factory: Optional[SchemaTreeFactory] = None) -> None:
         """Initialize the class instance.
 
@@ -71,6 +74,7 @@ class DataModel:
             yltxt: JSON text with YANG library data.
             mod_path: Tuple of directories where to look for YANG modules.
             description: Optional description of the data model.
+            data_factory: Factory for getting SchemaData instance.
             tree_factory: Factory for getting SchemaTreeNode instance.
 
         Raises:
@@ -86,7 +90,9 @@ class DataModel:
             self.yang_library = json.loads(yltxt)
         except json.JSONDecodeError as e:
             raise BadYangLibraryData(str(e)) from None
-        self.schema_data = SchemaData(self.yang_library, mod_path)
+        if data_factory is None:
+            data_factory = SchemaDataFactory()
+        self.schema_data = data_factory.create_schema_data(self.yang_library, mod_path)
         if tree_factory is None:
             tree_factory = SchemaTreeFactory()
         self.schema = tree_factory.create_tree(self.schema_data)
