@@ -11,7 +11,7 @@ from .statement import Statement
 from .typealiases import DataPath, InstanceName, JSONPointer, QualName, RawEntry, RawList, RawMetadataObject, RawObject, RawValue, ScalarValue, SchemaRoute, YangIdentifier, RawScalar
 from .xpathast import Expr, LocationPath, Root, Step
 from .xpathparser import XPathParser
-from typing import Optional
+from typing import Optional, ClassVar
 
 class Annotation:
     type: DataType
@@ -179,3 +179,6 @@ class OutputNode(InternalNode, DataNode):
 class NotificationNode(SchemaTreeNode):
     default_deny: DefaultDeny
     def __init__(self) -> None: ...
+
+class SchemaTreeFactory:
+    def create_tree(self, schemadata: SchemaData) -> SchemaTreeNode: ...
