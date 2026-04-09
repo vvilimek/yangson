@@ -26,7 +26,7 @@ This module implements the following classes:
 * FeatureExprParser: Parser for if-feature expressions.
 """
 from collections.abc import MutableSet
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, ClassVar
 from .exceptions import (
     InvalidSchemaPath, BadYangLibraryData, CyclicImports, DefinitionNotFound,
     FeaturePrerequisiteError, InvalidFeatureExpression, ModuleNotFound,
