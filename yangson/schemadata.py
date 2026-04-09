@@ -108,7 +108,7 @@ class ModuleDataFactory:
 class SchemaDataFactory:
     """Factory interface as well as default implementation of schema data factory."""
 
-    def create_schema_data(self, yang_lib: dict[str, Any], mod_path: list[str]) -> SchemaData:
+    def create_schema_data(self, yang_lib: dict[str, Any], mod_path: list[str]) -> "SchemaData":
         """Create schema data from yang library with module search path.
 
         Args:
@@ -121,7 +121,6 @@ class SchemaDataFactory:
         # TODO Raises section
 
         return SchemaData(yang_lib, mod_path)
-    """"""
 
 class SchemaData:
     """Repository of YANG schema structures and utility methods.
