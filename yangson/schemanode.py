@@ -491,7 +491,7 @@ class InternalNode(SchemaNode):
         ns = ns if ns else self.ns
         todo = []
         for child in self.children:
-            if child.name is None:
+            if child.name is None: # Handle input/output
                 todo.append(child)
             elif child.name == name and child.ns == ns:
                 return child
@@ -1188,6 +1188,28 @@ class SchemaTreeNode(GroupNode):
             target._add_child(gr)
             target = grp
         target._handle_substatements(stmt, sctx)
+
+    def get_child(self, name: YangIdentifier,
+                  ns: YangIdentifier = None) -> Optional[SchemaNode]:
+        """Return receiver's schema child.
+
+        Args:
+            name: Child's name.
+            ns: Child's namespace (= `self.ns` if absent).
+        """
+        ns = ns if ns else self.ns
+        todo = []
+        for child in self.children:
+            if child.name is None:
+                todo.append(child)
+            if isinstance(child, YangData):
+                todo.append(child)
+            elif child.name == name and child.ns == ns:
+                return child
+        for c in todo:
+            grandchild = c.get_child(name, ns)
+            if grandchild is not None:
+                return grandchild
 
 
 class DataNode(SchemaNode):
@@ -2120,6 +2142,10 @@ class RpcActionNode(SchemaTreeNode):
         else:
             super().as_schema_route()
 
+    def get_child(self, name: YangIdentifier,
+                  ns: YangIdentifier = None) -> Optional[SchemaNode]:
+        return InternalNode.get_child(self, name, ns)
+
 class InputNode(InternalNode, DataNode):
     """RPC or action input node."""
 
@@ -2180,6 +2206,10 @@ class NotificationNode(SchemaTreeNode):
 
     def _tree_line_prefix(self, ctype: bool) -> str:
         return super()._tree_line_prefix(ctype) + "-n"
+
+    def get_child(self, name: YangIdentifier,
+                  ns: YangIdentifier = None) -> Optional[SchemaNode]:
+        return InternalNode.get_child(self, name, ns)
 
 
 class SchemaTreeFactory:
