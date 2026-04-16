@@ -9,7 +9,7 @@ class StrInstanceNode(Protocol):
 class BoolInstanceNode(Protocol):
     value: bool
 
-def IntInstanceNode(Protocol):
+class IntInstanceNode(Protocol):
     value: int
 
 class DecimalInstanceNode(Protocol):
