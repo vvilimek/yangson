@@ -30,3 +30,5 @@ class InstanceNodeProtocol(Protocol):
 
 class ArrayInstanceNode(Protocol):
     value: ArrayValue
+
+    def raw_value(self, filter: OutputFilter = OutputFilter()) -> ArrayValue: ...

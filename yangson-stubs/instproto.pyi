@@ -1,7 +1,7 @@
 from typing import Protocol
 from decimal import Decimal
 
-from .instvalue import Value
+from .instvalue import Value, ArrayValue
 
 class StrInstanceNode(Protocol):
     value: str
@@ -30,3 +30,5 @@ class InstanceNodeProtocol(Protocol):
 
 class ArrayInstanceNode(Protocol):
     value: ArrayValue
+
+    def raw_value(self, filter: OutputFilter = OutputFilter()) -> ArrayValue: ...
