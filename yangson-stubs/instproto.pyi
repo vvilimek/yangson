@@ -27,3 +27,6 @@ class IdentifierInstanceNode(Protocol):
 
 class InstanceNodeProtocol(Protocol):
     value: Value
+
+class ArrayInstanceNodeProtocol(Protocol):
+    value: ArrayValue
