@@ -978,10 +978,9 @@ class YangData(GroupNode):
     # TODO from_raw, from_xml
     # TODO ascii tree printing
 
-    def __init__(self, sctx: Optional[SchemaContext] = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self._ctype = ContentType.all
-        self.context = sctx
         self._y_data_struct = self
 
     def data_parent(self) -> Optional["InternalNode"]:
@@ -1172,7 +1171,7 @@ class SchemaTreeNode(GroupNode):
 
         # The if-feature statement are to be ignored, we simply enable all possible feature
         yd_sctx = SchemaContext(yd_sch_data, sctx.default_ns, sctx.text_mid)
-        yang_data = YangData(yd_sctx)
+        yang_data = YangData()
         self._handle_child(yang_data, stmt, yd_sctx)
 
     def _sx_structure_stmt(self, stmt: Statement, sctx: SchemaContext) -> None:
@@ -1488,10 +1487,9 @@ class Structure(DataNode, InternalNode):
     # TODO strict substatement parsing
     # test and fix optinoality of list key stmt
     # TODO from_raw, from_xml
-    def __init__(self, sctx: Optional[SchemaContext] = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self._ctype = ContentType.all
-        self.context = sctx
         self._y_data_struct = self
 
     def data_parent(self) -> Optional["InternalNode"]:
