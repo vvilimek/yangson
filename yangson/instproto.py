@@ -1,7 +1,7 @@
 from typing import Protocol
 from decimal import Decimal
 
-from .instvalue import Value
+from .instvalue import Value, ArrayValue
 
 class StrInstanceNode(Protocol):
     value: str
@@ -28,3 +28,5 @@ class IdentifierInstanceNode(Protocol):
 class InstanceNodeProtocol(Protocol):
     value: Value
 
+class ArrayInstanceNode(Protocol):
+    value: ArrayValue
