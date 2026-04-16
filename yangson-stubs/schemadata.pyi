@@ -3,7 +3,7 @@ from .exceptions import BadYangLibraryData, CyclicImports, DefinitionNotFound, F
 from .parser import Parser
 from .statement import ModuleParser, Statement
 from .typealiases import ModuleId, PrefName, QualName, RevisionDate, SchemaNodeId, SchemaPath, SchemaRoute, YangIdentifier
-from collections.abc import MutableSet
+from collections.abc import MutableSet, Mapping
 from typing import Any, ClassVar
 
 class IdentityAdjacency:
@@ -32,9 +32,9 @@ class SchemaData:
     identity_adjs: dict[QualName, IdentityAdjacency]
     implement: dict[YangIdentifier, RevisionDate]
     module_search_path: list[str]
-    modules: dict[ModuleId, ModuleData]
-    modules_by_name: dict[str, ModuleData]
-    modules_by_ns: dict[str, ModuleData]
+    modules: Mapping[ModuleId, ModuleData]
+    modules_by_name: Mapping[str, ModuleData]
+    modules_by_ns: Mapping[str, ModuleData]
     module_data_factory: ClassVar[type]
     def __init__(self, yang_lib: dict[str, Any], mod_path: list[str]) -> None: ...
     def namespace(self, mid: ModuleId) -> YangIdentifier: ...
