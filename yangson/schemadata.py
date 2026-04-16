@@ -22,10 +22,12 @@ This module implements the following classes:
 
 * SchemaContext: Schema data and current schema context.
 * ModuleData: Data related to a YANG module or submodule.
+* ModuleDataFactory: Factory interface as well as default implementation of module data factory.
+* SchemaDataFactory: Factory interface as well as default implementation of schema data factory.
 * SchemaData: Repository of YANG schema structures and methods.
 * FeatureExprParser: Parser for if-feature expressions.
 """
-from collections.abc import MutableSet
+from collections.abc import MutableSet, Mapping
 from typing import Any, Optional, Sequence, ClassVar
 from .exceptions import (
     InvalidSchemaPath, BadYangLibraryData, CyclicImports, DefinitionNotFound,
@@ -89,6 +91,8 @@ class ModuleData:
 
 
 class ModuleDataFactory:
+    """Factory interface as well as default implementation of module data factory."""
+
     def create_module_data(self, main_module: YangIdentifier, yang_id: YangIdentifier) -> ModuleData:
         """Create a module data.
 
@@ -129,6 +133,7 @@ class SchemaData:
     """
 
     module_data_factory: ClassVar[type] = ModuleDataFactory
+    """Factory used for ModuleData initialization."""
 
     def __init__(self, yang_lib: dict[str, Any],
                  mod_path: Sequence[str]) -> None:
@@ -139,13 +144,13 @@ class SchemaData:
         """Dictionary of implemented revisions."""
         self.module_search_path = mod_path
         """List of directories where to look for YANG modules."""
-        self.modules: dict[ModuleId, ModuleData] = {}
+        self.modules: Mapping[ModuleId, ModuleData] = {}
         """Dictionary of module data."""
-        self.modules_by_name: dict[str, ModuleData] = {}
+        self.modules_by_name: Mapping[str, ModuleData] = {}
         """Dictionary of module data by module name."""
-        self.modules_by_ns = {}
-        self._module_sequence = []  # type: list[ModuleId]
-        self._import_module_sequence = [] # type: list[ModuleId]
+        self.modules_by_ns: Mapping[str, ModuleData] = {}
+        self._module_sequence: list[ModuleId] = []
+        self._import_module_sequence: list[ModuleId] = []
         """List that defines the order of module processing."""
         self._from_yang_library(yang_lib)
 

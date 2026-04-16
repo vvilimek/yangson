@@ -2223,8 +2223,6 @@ class SchemaTreeFactory:
 
         Returns:
             Created schema tree node.
-
-        Raises:
-            TODO
         """
+        # TODO: Raises section
         return SchemaTreeNode(schemadata)
