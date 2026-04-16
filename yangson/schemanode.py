@@ -40,7 +40,6 @@ This module implements the following classes:
 * AnydataNode: YANG anydata node.
 * AnyxmlNode: YANG anyxml node.
 """
-import logging
 from collections import deque
 from collections.abc import MutableSet
 from datetime import datetime
@@ -73,8 +72,6 @@ from .typealiases import (DataPath, InstanceName, JSONPointer, QualName,
 from .xpathast import Expr, LocationPath, Step, Root
 from .xpathparser import XPathParser
 
-dbg_logger = logging.getLogger(__name__)
-dbg_logger.setLevel(logging.DEBUG)
 
 class Annotation:
     """Class for metadata annotations [RFC 7952]."""
@@ -91,7 +88,6 @@ class SchemaNode:
 
     def __init__(self) -> None:
         """Initialize the class instance."""
-        dbg_logger.debug(f"yangson.SchemaNode __init__() {self.__class__.__name__}")
         self.name: Optional[YangIdentifier] = None
         """Name of the receiver."""
         self.ns: Optional[YangIdentifier] = None
@@ -477,7 +473,6 @@ class InternalNode(SchemaNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.InternalNode __init__() {self.__class__.__name__}")
         self.children: list[SchemaNode] = []
         self.schema_pattern: Optional[SchemaPattern] = None
         self._mandatory_children = (set(), set())
@@ -954,10 +949,6 @@ class InternalNode(SchemaNode):
 class GroupNode(InternalNode):
     """Anonymous group of schema nodes."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        dbg_logger.debug(f"yangson.GroupNode __init__() {self.__class__.__name__}")
-
     def _handle_child(self, node: SchemaNode, stmt: Statement,
                       sctx: SchemaContext) -> None:
         if not isinstance(
@@ -989,7 +980,6 @@ class YangData(GroupNode):
 
     def __init__(self, sctx: Optional[SchemaContext] = None) -> None:
         super().__init__()
-        dbg_logger.debug(f"yangson.YangData.__init__() {self.__class__.__name__}")
         self._ctype = ContentType.all
         self.context = sctx
         self._y_data_struct = self
@@ -1103,7 +1093,6 @@ class SchemaTreeNode(GroupNode):
     def __init__(self, schemadata: Optional[SchemaData] = None) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.SchemaTreeNode.__init__({schemadata})")
         self.annotations: dict[QualName, Annotation] = {}
         self.schema_data = schemadata
         self._status = NodeStatus.current
@@ -1237,7 +1226,6 @@ class DataNode(SchemaNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.DataNode.__init__() {self.__class__.__name__}")
         self.default_deny: DefaultDeny = DefaultDeny.none
 
     def orphan_instance(self, rval: RawValue) -> ObjectMember:
@@ -1328,7 +1316,6 @@ class TerminalNode(SchemaNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.TerminalNode.__init__() {self.__class__.__name__}")
         self.type: DataType = None
         self._default: Optional[Value] = None
         self._units: Optional[str] = None
@@ -1443,7 +1430,6 @@ class ContainerNode(DataNode, InternalNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.ContainerNode.__init__() {self.__class__.__name__}")
         self.presence: bool = False
 
     @property
@@ -1504,7 +1490,6 @@ class Structure(DataNode, InternalNode):
     # TODO from_raw, from_xml
     def __init__(self, sctx: Optional[SchemaContext] = None) -> None:
         super().__init__()
-        dbg_logger.debug(f"yangson.Structure.__init__() {self.__class__.__name__}")
         self._ctype = ContentType.all
         self.context = sctx
         self._y_data_struct = self
@@ -1583,7 +1568,6 @@ class SequenceNode(DataNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.SequenceNode.__init__() {self.__class__.__name__}")
         self.min_elements: int = 0
         self.max_elements: Optional[int] = None
         self.user_ordered: bool = False
@@ -1749,7 +1733,6 @@ class ListNode(SequenceNode, InternalNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.ListNode.__init__() {self.__class__.__name__}")
         self.keys: list[QualName] = []
         self._key_members = []
         self.unique: list[list[LocationPath]] = []
@@ -1865,7 +1848,6 @@ class ChoiceNode(InternalNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.ChoiceNode.__init__() {self.__class__.__name__}")
         self.default_case: QualName = None
         self._mandatory: bool = False
 
@@ -1949,10 +1931,6 @@ class ChoiceNode(InternalNode):
 class CaseNode(InternalNode):
     """Case node."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        dbg_logger.debug(f"yangson.CaseNode.__init__() {self.__class__.__name__}")
-
     def _pattern_entry(self) -> SchemaPattern:
         return super()._schema_pattern()
 
@@ -1967,7 +1945,6 @@ class LeafNode(DataNode, TerminalNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.LeafNode.__init__() {self.__class__.__name__}")
         self._mandatory: bool = False
 
     @property
@@ -2008,10 +1985,6 @@ class LeafNode(DataNode, TerminalNode):
 
 class LeafListNode(SequenceNode, TerminalNode):
     """Leaf-list node."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        dbg_logger.debug(f"yangson.LeafListNode.__init__() {self.__class__.__name__}")
 
     @property
     def default(self) -> Optional[ScalarValue]:
@@ -2067,7 +2040,6 @@ class AnyContentNode(DataNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.AnyContentNode.__init__() {self.__class__.__name__}")
         self._mandatory: bool = False
 
     def content_type(self) -> ContentType:
@@ -2123,18 +2095,12 @@ class AnyContentNode(DataNode):
 
 class AnydataNode(AnyContentNode):
     """Anydata node."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        dbg_logger.debug(f"yangson.AnydataNode.__init__() {self.__class__.__name__}")
+    pass
 
 
 class AnyxmlNode(AnyContentNode):
     """Anyxml node."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        dbg_logger.debug(f"yangson.AnyxmlNode.__init__() {self.__class__.__name__}")
+    pass
 
 
 class RpcActionNode(SchemaTreeNode):
@@ -2143,7 +2109,6 @@ class RpcActionNode(SchemaTreeNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.RpcActionNode.__init__() {self.__class__.__name__}")
         self.default_deny: DefaultDeny = DefaultDeny.none
         self._ctype = ContentType.nonconfig
 
@@ -2195,7 +2160,6 @@ class InputNode(InternalNode, DataNode):
     def __init__(self, ns) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.InputNode.__init__() {self.__class__.__name__}")
         self._config = False
         self.name = "input"
         self.ns = ns
@@ -2219,7 +2183,6 @@ class OutputNode(InternalNode, DataNode):
     def __init__(self, ns) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.OutputNode.__init__() {self.__class__.__name__}")
         self._config = False
         self.name = "output"
         self.ns = ns
@@ -2243,7 +2206,6 @@ class NotificationNode(SchemaTreeNode):
     def __init__(self) -> None:
         """Initialize the class instance."""
         super().__init__()
-        dbg_logger.debug(f"yangson.NotificationNode.__init__() {self.__class__.__name__}")
         self.default_deny: DefaultDeny = DefaultDeny.none
         self._ctype = ContentType.nonconfig
 
