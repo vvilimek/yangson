@@ -774,9 +774,9 @@ class InternalNode(SchemaNode):
                       sctx: SchemaContext) -> None:
         """Handle **augment** statement."""
         # TODO augmenting YangData is forbidden
-        if not sctx.schema_data.if_features(stmt, sctx.text_mid):
-            # and \
-            #not isinstance(self._y_data_struct, YangData):
+        if (not sctx.schema_data.if_features(stmt, sctx.text_mid)
+                and
+                not isinstance(self._y_data_struct, YangData)):
             # ietf-restconf:yang-data ignores if-feature statements
             return
         target = self.get_schema_descendant(
@@ -1210,8 +1210,6 @@ class SchemaTreeNode(GroupNode):
         todo = []
         for child in self.children:
             if child.name is None:
-                todo.append(child)
-            if isinstance(child, YangData):
                 todo.append(child)
             elif child.name == name and child.ns == ns:
                 return child
