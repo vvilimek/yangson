@@ -19,19 +19,19 @@
         "name": "defs",
         "namespace": "http://example.com/defs",
         "revision": "",
-        "conformance-type": "import"
+        "conformance-type": "implement"
       },
       {
         "name": "a",
         "namespace": "http://example.com/a",
         "revision": "",
-        "conformance-type": "import"
+        "conformance-type": "implement"
       },
       {
         "name": "trans",
         "namespace": "http://example.com/a",
         "revision": "",
-        "conformance-type": "import"
+        "conformance-type": "implement"
       },
       {
         "name": "b",
