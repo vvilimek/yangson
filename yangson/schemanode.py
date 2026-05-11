@@ -59,6 +59,7 @@ from .exceptions import (
     InvalidStatement, YangsonException, YangTypeError, InvalidArgument)
 from .instance import (ArrayEntry, InstanceNode, MemberName, ObjectMember)
 from .instroute import InstanceRoute
+from .instance import ArrayEntry
 from .instvalue import (
     ArrayValue, EntryValue, MetadataObject, ObjectValue, Value)
 from .schemadata import IdentityAdjacency, SchemaContext, SchemaData
@@ -249,7 +250,7 @@ class SchemaNode:
         return cast(str, self.name if self.parent and self.ns == self.parent.ns
                     else f"{self.ns}:{self.name}")
 
-    def _validate(self, inst: InstanceNode, scope: ValidationScope,
+    def _validate(self, inst: "InstanceNode", scope: ValidationScope,
                   ctype: ContentType) -> None:
         """Validate instance against the receiver.
 
@@ -660,7 +661,7 @@ class InternalNode(SchemaNode):
             rc[c.iname()] = c._node_digest()
         return res
 
-    def _validate(self, inst: InstanceNode,
+    def _validate(self, inst: "InstanceNode",
                   scope: ValidationScope, ctype: ContentType) -> None:
         """Extend the superclass method."""
         if scope.value & ValidationScope.syntax.value:   # schema
@@ -679,7 +680,7 @@ class InternalNode(SchemaNode):
         """Return the set of instance names under the receiver."""
         return frozenset([c.iname() for c in self.data_children()])
 
-    def _check_schema_pattern(self, inst: InstanceNode,
+    def _check_schema_pattern(self, inst: "InstanceNode",
                               ctype: ContentType) -> None:
         p = self.schema_pattern
         p._eval_when(inst)
@@ -739,8 +740,8 @@ class InternalNode(SchemaNode):
         else:
             self._mandatory_children[0].add(node)
 
-    def _add_defaults(self, inst: InstanceNode, ctype: Optional[ContentType],
-                      lazy: bool = False) -> InstanceNode:
+    def _add_defaults(self, inst: "InstanceNode", ctype: Optional[ContentType],
+                      lazy: bool = False) -> "InstanceNode":
         for c in self.filter_children(ctype):
             if isinstance(c, DataNode):
                 inst = c._default_instance(inst, ctype, lazy)
@@ -1237,8 +1238,8 @@ class DataNode(SchemaNode):
         val = self.from_raw(rval, jptr="/")
         return ObjectMember(self.iname(), {}, val, None, self, datetime.now())
 
-    def split_instance_route(self, route: InstanceRoute) -> Optional[
-            tuple[InstanceRoute, InstanceRoute]]:
+    def split_instance_route(self, route: "InstanceRoute") -> Optional[
+            tuple["InstanceRoute", "InstanceRoute"]]:
         """Split `route` into the part up to receiver and the rest.
 
         Args:
@@ -1273,15 +1274,15 @@ class DataNode(SchemaNode):
             if i >= len(route):
                 return None
 
-    def _validate(self, inst: InstanceNode, scope: ValidationScope,
+    def _validate(self, inst: "InstanceNode", scope: ValidationScope,
                   ctype: ContentType) -> None:
         """Extend the superclass method."""
         if scope.value & ValidationScope.semantics.value:
             self._check_must(inst)        # must expressions
         super()._validate(inst, scope, ctype)
 
-    def _default_instance(self, pnode: InstanceNode, ctype: ContentType,
-                          lazy: bool = False) -> InstanceNode:
+    def _default_instance(self, pnode: "InstanceNode", ctype: ContentType,
+                          lazy: bool = False) -> "InstanceNode":
         iname = self.iname()
         if iname in pnode.value:
             return pnode
@@ -1292,7 +1293,7 @@ class DataNode(SchemaNode):
                 return wd.up()
         return pnode
 
-    def _check_must(self, inst: InstanceNode) -> None:
+    def _check_must(self, inst: "InstanceNode") -> None:
         for m in self.must:
             if not m.expression.evaluate(inst):
                 raise SemanticError(inst, m.error_tag, m.error_message)
@@ -1374,7 +1375,7 @@ class TerminalNode(SchemaNode):
         elif action in ("add", "replace"):
             self._units_stmt(stmt, sctx)
 
-    def _validate(self, inst: InstanceNode,
+    def _validate(self, inst: "InstanceNode",
                   scope: ValidationScope, ctype: ContentType) -> None:
         """Extend the superclass method."""
         if (scope.value & ValidationScope.syntax.value and
@@ -1392,8 +1393,8 @@ class TerminalNode(SchemaNode):
                 raise SemanticError(inst, "instance-required")
         super()._validate(inst, scope, ctype)
 
-    def _default_value(self, inst: InstanceNode, ctype: ContentType,
-                       lazy: bool) -> InstanceNode:
+    def _default_value(self, inst: "InstanceNode", ctype: ContentType,
+                       lazy: bool) -> "InstanceNode":
         inst.value = self.default
         return inst
 
@@ -1453,14 +1454,14 @@ class ContainerNode(DataNode, InternalNode):
         if propagate:
             self.parent._add_mandatory_child(self)
 
-    def _default_instance(self, pnode: InstanceNode, ctype: ContentType,
-                          lazy: bool = False) -> InstanceNode:
+    def _default_instance(self, pnode: "InstanceNode", ctype: ContentType,
+                          lazy: bool = False) -> "InstanceNode":
         if self.presence:
             return pnode
         return super()._default_instance(pnode, ctype, lazy)
 
-    def _default_value(self, inst: InstanceNode, ctype: ContentType,
-                       lazy: bool) -> Optional[InstanceNode]:
+    def _default_value(self, inst: "InstanceNode", ctype: ContentType,
+                       lazy: bool) -> Optional["InstanceNode"]:
         inst.value = ObjectValue()
         return inst if lazy else self._add_defaults(inst, ctype)
 
@@ -1557,8 +1558,8 @@ class Structure(DataNode, InternalNode):
     def _tree_line_prefix(self, ctype: bool) -> str:
         return "structure"
 
-    def _default_value(self, inst: InstanceNode, ctype: ContentType,
-                       lazy: bool) -> InstanceNode:
+    def _default_value(self, inst: "InstanceNode", ctype: ContentType,
+                       lazy: bool) -> "InstanceNode":
         return ContainerNode._default_value(self, inst, ctype, lazy)
 
 
@@ -1577,7 +1578,7 @@ class SequenceNode(DataNode):
         """Override the superclass property."""
         return self.min_elements > 0
 
-    def _validate(self, inst: InstanceNode,
+    def _validate(self, inst: "InstanceNode",
                   scope: ValidationScope,
                   ctype: ContentType) -> None:
         """Extend the superclass method."""
@@ -1590,7 +1591,7 @@ class SequenceNode(DataNode):
             for e in inst:
                 super()._validate(e, scope, ctype)
 
-    def _check_cardinality(self, inst: InstanceNode) -> None:
+    def _check_cardinality(self, inst: "InstanceNode") -> None:
         if len(inst.value) < self.min_elements:
             raise SemanticError(inst, "too-few-elements")
         if (self.max_elements is not None and
@@ -1742,14 +1743,14 @@ class ListNode(SequenceNode, InternalNode):
         res["keys"] = self._key_members
         return res
 
-    def _check_list_props(self, inst: InstanceNode) -> None:
+    def _check_list_props(self, inst: "InstanceNode") -> None:
         """Check uniqueness of keys and "unique" properties, if applicable."""
         if self.keys:
             self._check_keys(inst)
         for u in self.unique:
             self._check_unique(u, inst)
 
-    def _check_keys(self, inst: InstanceNode) -> None:
+    def _check_keys(self, inst: "InstanceNode") -> None:
         ukeys = set()
         for i in range(len(inst.value)):
             en = inst.value[i]
@@ -1764,7 +1765,7 @@ class ListNode(SequenceNode, InternalNode):
             ukeys.add(kval)
 
     def _check_unique(self, unique: list[LocationPath],
-                      inst: InstanceNode) -> None:
+                      inst: "InstanceNode") -> None:
         allvals = set()
         for i in range(len(inst.value)):
             en = inst[i]
@@ -1779,8 +1780,8 @@ class ListNode(SequenceNode, InternalNode):
             else:
                 allvals |= tups
 
-    def _default_instance(self, pnode: InstanceNode, ctype: ContentType,
-                          lazy: bool = False) -> InstanceNode:
+    def _default_instance(self, pnode: "InstanceNode", ctype: ContentType,
+                          lazy: bool = False) -> "InstanceNode":
         return pnode
 
     def _post_process(self) -> None:
@@ -1856,8 +1857,8 @@ class ChoiceNode(InternalNode):
         """Override the superclass property."""
         return self._mandatory
 
-    def _add_defaults(self, inst: InstanceNode,
-                      ctype: Optional[ContentType]) -> InstanceNode:
+    def _add_defaults(self, inst: "InstanceNode",
+                      ctype: Optional[ContentType]) -> "InstanceNode":
         if self.when and not self.when.evaluate(inst):
             return inst
         ac = self._active_case(inst.value)
@@ -1999,7 +2000,7 @@ class LeafListNode(SequenceNode, TerminalNode):
     def _yang_class(self) -> str:
         return "leaf-list"
 
-    def _check_list_props(self, inst: InstanceNode) -> None:
+    def _check_list_props(self, inst: "InstanceNode") -> None:
         if (self.content_type() == ContentType.config and
                 len(set(inst.value)) < len(inst.value)):
             raise SemanticError(inst, "repeated-leaf-list-value")
@@ -2078,8 +2079,8 @@ class AnyContentNode(DataNode):
     def from_xml(self, rval: ET.Element, jptr: JSONPointer = "") -> Value:
         super().from_xml(rval, jptr)
 
-    def _default_instance(self, pnode: InstanceNode, ctype: ContentType,
-                          lazy: bool = False) -> InstanceNode:
+    def _default_instance(self, pnode: "InstanceNode", ctype: ContentType,
+                          lazy: bool = False) -> "InstanceNode":
         return pnode
 
     def _tree_line(self, no_type: bool = False, ctype: bool = True) -> str:

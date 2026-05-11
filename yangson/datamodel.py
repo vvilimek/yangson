@@ -29,7 +29,7 @@ import xml.etree.ElementTree as ET
 from .enumerations import ContentType
 from .exceptions import (BadYangLibraryData, BadSchemaNodeType,
                          InvalidArgument, NonexistentSchemaNode)
-from .instance import InstanceIdParser, ResourceIdParser, RootNode
+from .instance import InstanceIdParser, ResourceIdParser, RootNode, InternalNode
 from .instroute import InstanceRoute
 from .instvalue import ObjectValue
 from .schemadata import SchemaData, SchemaDataFactory, SchemaContext

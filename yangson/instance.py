@@ -51,6 +51,7 @@ from .typealiases import (InstanceName, JSONPointer, QualName, RawScalar,
                           RawValue, SchemaRoute, YangIdentifier, _Singleton)
 if TYPE_CHECKING:
     from .schemadata import SchemaData
+    from .instance import InstanceNode
 
 __all__ = ["InstanceNode", "RootNode", "ObjectMember", "ArrayEntry",
            "InstanceIdParser", "ResourceIdParser", "InstanceException",
