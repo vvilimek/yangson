@@ -28,17 +28,21 @@ This module implements the following classes:
 * FeatureExprParser: Parser for if-feature expressions.
 """
 from collections.abc import MutableSet, Mapping
-from typing import Any, Optional, Sequence, ClassVar
+from typing import Any, Optional, Sequence, ClassVar, TYPE_CHECKING
 from .exceptions import (
     InvalidSchemaPath, BadYangLibraryData, CyclicImports, DefinitionNotFound,
     FeaturePrerequisiteError, InvalidFeatureExpression, ModuleNotFound,
     ModuleNotImplemented, ModuleNotImported, ModuleNotRegistered,
-    ModuleContentMismatch, MultipleImplementedRevisions, UnknownPrefix)
+    ModuleContentMismatch, MultipleImplementedRevisions, UnknownPrefix,
+    InvalidNID)
 from .parser import Parser
 from .statement import ModuleParser, Statement
 from .typealiases import (ModuleId, PrefName, QualName, RevisionDate,
                           SchemaNodeId, SchemaPath, SchemaRoute,
                           YangIdentifier)
+
+if TYPE_CHECKING:
+    from .schemanode import SchemaTreeNode
 
 
 class IdentityAdjacency:
@@ -385,7 +389,7 @@ class SchemaData:
         """Translate node identifier to a qualified name.
 
         Args:
-            ni: Node identifier (with optional prefix).
+            ni: Node idenTifier (with optional prefix).
             sctx: SchemaContext.
 
         Raises:
@@ -444,6 +448,64 @@ class SchemaData:
         res = []
         for qn in (nlist[1:] if sni[0] == "/" else nlist):
             res.append(self.translate_node_id(qn, sctx))
+        return res
+
+    def nid2route(self, nid: str, schema: "SchemaTreeNode") -> SchemaRoute:
+        """Translate NID (Node Item iDentifier) to a schema route.
+
+        Args:
+            nid: Node Item iDentifier to be translated.
+            sctx: Schema context.
+
+        Raises:
+            ModuleNotRegistered: If `mid` is not registered in the data model.
+        """
+        from .schemanode import ChoiceNode
+
+        # TODO test this functionality
+        nlist = nid.split("/")
+        prevns = None
+        res = []
+        node = schema
+        # the NID is always absolute
+        for n in nlist[1:]:
+            p, s, loc = n.partition(":")
+            if s:
+                if p == prevns:
+                    raise InvalidNID(nid)
+                next = (loc, p)
+            elif prevns:
+                next = (p, prevns)
+            else:
+                raise InvalidNID(nid)
+
+            child = node.get_child(*next)
+            if child is None:
+                found = False
+                for choice in node.children:
+                    if not isinstance(choice, ChoiceNode):
+                        continue
+
+                    for case in choice.children:
+                        for child in case.children:
+                            if child.qual_name != next:
+                                continue
+
+                            res.append(choice.qual_name)
+                            res.append(case.qual_name)
+                            res.append(next)
+                            prevns = next[1]
+                            node = child
+                            found = True
+
+                if not found:
+                    # child not found
+                    raise InvalidNID(nid)
+            else:
+                res.append(next)
+                prevns = next[1]
+                node = child
+
         return res
 
     @staticmethod

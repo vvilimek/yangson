@@ -37,6 +37,7 @@ This module defines the following exceptions:
 * :exc:`InvalidKeyValue`: Invalid list key or leaf-list value.
 * :exc:`InvalidLeafrefPath`: A leafref path is incorrect.
 * :exc:`InvalidSchemaPath`: Invalid schema path
+* :exc:`InvalidNID`: Invalid Name Item iDentifier
 * :exc:`InvalidXPath`: An XPath expression is invalid.
 * :exc:`MissingAnnotationTarget`: Instance node that is being annotated
   doesn't exist.
@@ -303,6 +304,14 @@ class InvalidSchemaPath(YangsonException):
     def __str__(self) -> str:
         return self.path
 
+class InvalidNID(YangsonException):
+    """Invalid Name Item iDentifier."""
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+
+    def __str__(self) -> str:
+        return self.path
 
 class UnknownPrefix(YangsonException):
     """Unknown namespace prefix."""
