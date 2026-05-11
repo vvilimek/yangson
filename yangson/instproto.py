@@ -1,6 +1,6 @@
-from collections import deque, Iterator
+from collections import deque
 from datetime import datetime
-from typing import Protocol, Union, Optional, overload, Literal
+from typing import Protocol, Union, Optional, overload, Literal, Iterator
 from decimal import Decimal
 import xml.etree.ElementTree as ET
 
