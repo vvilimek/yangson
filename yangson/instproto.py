@@ -142,6 +142,8 @@ class EmptyInstanceNode(InstanceNodeProtocol):
     value: tuple[None]
 
 class IdentityInstanceNode(InstanceNodeProtocol):
-    value: tuple[str, ...]
-    #value: tuple[str, str]
+    #value: tuple[str, ...]
+    value: tuple[str, str]
 
+class ArrayInstanceNode(InstanceNodeProtocol):
+    value: list[Any]
