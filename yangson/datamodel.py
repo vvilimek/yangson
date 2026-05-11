@@ -99,7 +99,6 @@ class DataModel:
         self.schema = tree_factory.create_tree(self.schema_data)
         self.schema._ctype = ContentType.all
         self._build_schema()
-        self._build_imported_idents()
         self._restrict_yang_data_idents()
         self.schema.description = description if description else (
             "Data model ID: " +
@@ -258,16 +257,6 @@ class DataModel:
             for dev in mod.find_all("deviation"):
                 self.schema._deviation_stmt(dev, sctx)
         self.schema._post_process()
-
-    def _build_imported_idents(self) -> None:
-        for mid in self.schema_data._import_module_sequence:
-            if mid in self.schema_data._module_sequence:
-                continue
-            mod = self.schema_data.modules[mid].statement
-            for ident in mod.find_all("identity"):
-                sctx = SchemaContext(
-                    self.schema_data, self.schema_data.namespace(mid), mid)
-                self.schema._identity_stmt(ident, sctx)
 
     def _restrict_yang_data_idents(self) -> None:
         for c in self.schema.children:
