@@ -57,8 +57,7 @@ from .exceptions import (
     InvalidArgument, ParserException, ModuleNotRegistered, UnknownPrefix,
     InvalidLeafrefPath, MissingModuleNamespace, XPathTypeError)
 from .schemadata import SchemaContext
-from .instance import InstanceNode, InstanceIdParser
-from .instroute import InstanceRoute
+from .instance import InstanceNode, InstanceIdParser, InstanceRoute
 from .nodeset import NodeSet
 from .statement import Statement
 from .typealiases import (InstanceIdentifier, L, N, RN, QualName, RawScalar,

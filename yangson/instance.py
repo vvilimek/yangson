@@ -48,7 +48,6 @@ from .exceptions import (BadSchemaNodeType, EndOfInput, InstanceException,
                          MissingModuleNamespace, NonexistentInstance,
                          NonDataNode, NonexistentSchemaNode, UnexpectedInput,
                          YangTypeError)
-from .instroute import InstanceRoute
 from .instvalue import (ArrayValue, InstanceKey, ObjectValue, Value,
                         ScalarValue, StructuredValue)
 from .parser import Parser
@@ -60,7 +59,8 @@ if TYPE_CHECKING:
 
 __all__ = ["InstanceNode", "RootNode", "ObjectMember", "ArrayEntry",
            "InstanceIdParser", "ResourceIdParser", "InstanceException",
-           "InstanceValueError", "NonexistentInstance"]
+           "InstanceValueError", "NonexistentInstance",
+           "InstanceRoute"]
 
 
 class OutputFilter:
@@ -181,7 +181,7 @@ class InstanceNode:
         return "/" + "/".join([str(c) for c in self.path])
 
     def instance_route(self) -> "InstanceRoute":
-        """Return :class:`~.instroute.InstanceRoute` of the receiver."""
+        """Return :class:`~.instance.InstanceRoute` of the receiver."""
         res = []
         inst = self
         while inst.parinst:
@@ -1250,7 +1250,7 @@ class ResourceIdParser(Parser):
         super().__init__(text)
         self.schema_node = sn
 
-    def parse(self) -> InstanceRoute:
+    def parse(self) -> "InstanceRoute":
         """Parse resource identifier."""
         res = []
         if self.at_end():

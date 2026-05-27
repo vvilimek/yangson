@@ -34,8 +34,7 @@ from .schemadata import SchemaContext
 from .enumerations import Axis, MultiplicativeOp
 from .exceptions import InvalidArgument, XPathTypeError
 from .instance import (EntryIndex, EntryKeys, EntryValue, InstanceNode,
-                       MemberName)
-from .instroute import InstanceRoute
+                       MemberName, InstanceRoute)
 from .nodeset import NodeExpr, NodeSet, XPathValue
 from .typealiases import QualName, SchemaRoute
 
