@@ -22,8 +22,6 @@ module t1 {
 
   include t1-sub;
 
-  revision 2025-07-01;
-
   feature enabled;
   feature disabled;
 

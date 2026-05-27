@@ -11,8 +11,6 @@ module t3-8 {
     revision-date "2017-01-26";
   }
 
-  revision 2025-07-01;
-
   rc:yang-data data {
     // "notification" statement is illegal as a substatement of ietf-restconf:yang-data statement
     notification link-failure {

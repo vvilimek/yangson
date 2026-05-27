@@ -14,8 +14,6 @@ module a {
     prefix "tr";
   }
 
-  revision 2025-07-01;
-
   identity a-unbound;
   identity a-derived {
     base d:ident-base;

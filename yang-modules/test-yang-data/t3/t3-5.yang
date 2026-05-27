@@ -16,8 +16,6 @@ module t3-5 {
     revision-date "2013-07-15";
   }
 
-  revision 2025-07-01;
-
   rc:yang-data data {
     container main {
       leaf a {

@@ -6,8 +6,6 @@ module defs {
 
   prefix "defs";
 
-  revision 2025-07-01;
-
   identity ident-base;
   identity type-a {
     base ident-base;

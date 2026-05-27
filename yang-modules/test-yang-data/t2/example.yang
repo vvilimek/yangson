@@ -1,0 +1,29 @@
+module example {
+
+  yang-version "1.1";
+
+  namespace "http://example.com/t2-9";
+
+  prefix "e";
+
+  import ietf-restconf {
+    prefix "rc";
+    //revision-date 2017-01-26;
+  }
+
+  //revision 2025-07-01;
+
+  rc:yang-data ydata {
+    container proto-msg {
+      leaf version {
+        type int16;
+      }
+    }
+  }
+
+  augment "/t:ydata/t:proto-msg" {
+    leaf new {
+      type uint8;
+    }
+  }
+}

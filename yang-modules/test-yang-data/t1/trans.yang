@@ -10,8 +10,6 @@ module trans {
     prefix "d";
   }
 
-  revision 2025-07-01;
-
   identity tr-derived {
     base d:ident-base;
   }

@@ -11,8 +11,6 @@ submodule t1-sub {
     revision-date 2017-01-26;
   }
 
-  revision 2025-07-01;
-
   rc:yang-data ydata {
     container data {
       leaf a {

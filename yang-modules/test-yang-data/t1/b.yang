@@ -10,8 +10,6 @@ module b {
     prefix "d";
   }
 
-  revision 2025-07-01;
-
   identity b-derived {
     base d:ident-base;
   }
