@@ -11,7 +11,7 @@ from .statement import Statement
 from .typealiases import DataPath, InstanceName, JSONPointer, QualName, RawEntry, RawList, RawMetadataObject, RawObject, RawValue, ScalarValue, SchemaRoute, YangIdentifier, RawScalar
 from .xpathast import Expr, LocationPath, Root, Step
 from .xpathparser import XPathParser
-from typing import Optional, ClassVar
+from typing import Optional, ClassVar, Union
 
 class Annotation:
     type: DataType
