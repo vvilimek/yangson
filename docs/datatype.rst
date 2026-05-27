@@ -446,13 +446,13 @@ all :class:`~.schemanode.TerminalNode` instances.
    **instance-identifier** type.
 
    A :term:`cooked value` of this type is an
-   :class:`~.instroute.InstanceRoute` object parsed from a :term:`raw
+   :class:`~.instance.InstanceRoute` object parsed from a :term:`raw
    value` as defined in sec. `9.13`_ of [RFC7950]_.
 
    .. doctest::
 
       >>> type(ii_t.from_raw('/example-5-a:boolean-leaf'))
-      <class 'yangson.instroute.InstanceRoute'>
+      <class 'yangson.instance.InstanceRoute'>
       >>> str(ii_t.from_raw('/example-5-a:boolean-leaf'))
       '/example-5-a:boolean-leaf'
 

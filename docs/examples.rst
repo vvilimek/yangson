@@ -58,8 +58,8 @@ Directory: `docs/examples/ex2`__
 
 __ https://github.com/CZ-NIC/yangson/tree/master/docs/examples/ex2
 
-This example is used in the documentation of the :mod:`.instance` and
-:mod:`.instroute` modules, and also in :ref:`quick-start`.
+This example is used in the documentation of the :mod:`.instance`
+module, and also in :ref:`quick-start`.
 
 .. rubric:: Schema Tree
 
