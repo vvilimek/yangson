@@ -26,7 +26,7 @@ from collections.abc import MutableMapping
 import json
 import os
 import sys
-from typing import cast, Optional
+from typing import cast, Optional, TypedDict, Union, Literal
 from yangson import DataModel
 from yangson.enumerations import ContentType
 from yangson.exceptions import (
@@ -97,6 +97,18 @@ YL8525 = """
 """
 
 
+ModuleRawData = TypedDict("ModuleRawData", {
+    "name": str,
+    "revision": str,
+    "location": list[str],
+    "conformance-type": Union[Literal["implement"], Literal["import"]],
+    "schema": str,
+    "namespace": str,
+    "submodule": "ModuleRawData",
+    "feature": list[str],
+    "deviation": list[str],
+    }, total=False)
+
 class ModuleData:
 
     def __init__(self, val: ObjectValue) -> None:
@@ -112,7 +124,7 @@ class ModuleData:
 
     def as_raw(self) -> RawObject:
         """Return the receiver represented as an RFC 7895 entry."""
-        res: MutableMapping = {
+        res: ModuleRawData = {
             "name": self.name,
             "revision": self.revision
         }
@@ -143,14 +155,14 @@ class MainModuleData(ModuleData):
                     rev = ""
                 self.deviation.append((dmod.value, rev))
 
-    def add_submodule(self, sub_entry: ObjectValue):
+    def add_submodule(self, sub_entry: ObjectValue) -> None:
         """Add submodule defined in an RFC 8525 submodule entry."""
         smod = ModuleData(sub_entry)
         self.submodule[smod.key()] = smod
 
     def as_raw(self) -> RawObject:
         """Extend the superclass method."""
-        res: MutableMapping = super().as_raw()
+        res: ModuleRawData = super().as_raw()
         res["conformance-type"] = "import" if self.import_only else "implement"
         res["namespace"] = self.namespace
         if self.submodule:
