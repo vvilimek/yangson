@@ -17,7 +17,7 @@ yang-tools = ["pyang>=2.7.1,<3.0"]
 
 [tool.poetry]
 # based on yangson 1.7.7
-version = "0.1.1"
+version = "0.1.2"
 requires-poetry = '>=2.0'
 packages = [
   { include = "yangson" }, 
