@@ -1399,18 +1399,19 @@ class TerminalNode(SchemaNode):
         super()._post_process()
         root = self._y_data_struct if self._y_data_struct is not None else self.schema_root()
         self.type._post_process(self)
-        if isinstance(self.type, InstanceIdentifierType):
+        self._type_path_check(self.type, root)
+
+    def _type_path_check(self, type, root) -> None:
+        """Post process type path check"""
+        if isinstance(type, UnionType):
+            for t in type.types:
+                self._type_path_check(t, root)
+        elif isinstance(type, InstanceIdentifierType):
             # Populate the instance-identifier document root restricting accessible nodes.
-            self.type.root = root
-        elif isinstance(self.type, LeafrefType) and not self.type.path.check(self):
-            raise InvalidLeafrefPath("The 'path' references schema node outside the XPath context.")
-        elif isinstance(self.type, UnionType):
-            for t in self.type.types:
-                assert not isinstance(t, UnionType)
-                if isinstance(t, InstanceIdentifierType):
-                    t.root = root
-                elif isinstance(t, LeafrefType) and not self.type.path.check(self):
-                    raise InvalidLeafrefPath("The 'path' statement references schema node outside the XPath context.")
+            type.root = root
+        elif isinstance(type, LeafrefType) and not type.path.check(self):
+            # TODO add reference to the type and/or self
+            raise InvalidLeafrefPath("The 'path' statement references schema node outside the XPath context.")
 
     def _is_identityref(self) -> bool:
         return isinstance(self.type, IdentityrefType)
