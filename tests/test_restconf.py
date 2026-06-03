@@ -60,3 +60,21 @@ def test_errors_instance(data_model, data_errors):
     assert err.value["error-path"] == InstanceIdParser("/example-ops:input/delay").parse()
     assert err.value["error-message"] == "Invalid input parameter"
 
+def test_nids(data_model):
+    schema = data_model.schema
+    route = data_model.schema_data.nid2route(
+            nid="/ietf-restconf:errors",
+            schema=schema)
+    assert route == [("yang-errors", "ietf-restconf"), ("errors", "ietf-restconf")]
+
+    expected_node = schema.get_child("yang-errors", "ietf-restconf").get_child("errors", "ietf-restconf")
+    assert schema.get_schema_descendant(route) is expected_node
+
+    route = data_model.schema_data.nid2route(
+            nid="/ietf-restconf:errors/error/error-type",
+            schema=schema)
+    assert route == [("yang-errors", "ietf-restconf"), ("errors", "ietf-restconf"), ("error", "ietf-restconf"), ("error-type", "ietf-restconf")]
+
+    expected_node = expected_node.get_child("error", "ietf-restconf").get_child("error-type", "ietf-restconf")
+    assert schema.get_schema_descendant(route) == expected_node
+

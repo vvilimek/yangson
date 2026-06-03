@@ -460,7 +460,7 @@ class SchemaData:
         Raises:
             ModuleNotRegistered: If `mid` is not registered in the data model.
         """
-        from .schemanode import ChoiceNode
+        from .schemanode import ChoiceNode, YangData
 
         # TODO test this functionality
         nlist = nid.split("/")
@@ -482,21 +482,32 @@ class SchemaData:
             child = node.get_child(*next)
             if child is None:
                 found = False
-                for choice in node.children:
-                    if not isinstance(choice, ChoiceNode):
-                        continue
+                for choice_rc_yang_data in node.children:
+                    if isinstance(choice_rc_yang_data, ChoiceNode):
+                        choice = choice_rc_yang_data
+                        for case in choice.children:
+                            for child in case.children:
+                                if child.qual_name != next:
+                                    continue
 
-                    for case in choice.children:
-                        for child in case.children:
-                            if child.qual_name != next:
-                                continue
+                                res.append(choice.qual_name)
+                                res.append(case.qual_name)
+                                res.append(next)
+                                prevns = next[1]
+                                node = child
+                                found = True
+                    elif isinstance(choice_rc_yang_data, YangData):
+                        yang_data = choice_rc_yang_data
+                        # The yang-data MUST have one container child
+                        assert len(yang_data.children) == 1
+                        if yang_data.children[0].qual_name != next:
+                            continue
 
-                            res.append(choice.qual_name)
-                            res.append(case.qual_name)
-                            res.append(next)
-                            prevns = next[1]
-                            node = child
-                            found = True
+                        res.append(yang_data.qual_name)
+                        res.append(next)
+                        prevns = next[1]
+                        node = yang_data.children[0]
+                        found = True
 
                 if not found:
                     # child not found
