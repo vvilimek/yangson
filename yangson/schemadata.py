@@ -95,6 +95,14 @@ class ModuleData:
         self.submodules: MutableSet[ModuleId] = set()
         """Set of submodules."""
 
+    @property
+    def is_module(self) -> bool:
+        return self.main_module == self.yang_id
+
+    @property
+    def is_submodule(self) -> bool:
+        return self.main_module != self.yang_id
+
 
 class ModuleDataFactory:
     """Factory interface as well as default implementation of module data factory."""
